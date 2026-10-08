@@ -1,0 +1,12 @@
+#dmd-panel #dmh-panel{flex:1;min-height:0;flex-direction:column;gap:14px;overflow:hidden}
+#dmh-tools{display:flex;gap:8px;flex-wrap:wrap}#dmh-search{flex:1 0 100%;height:38px;background:#3a3a39;color:#eeeeea;border:1px solid #50504d;border-radius:4px;padding:8px 11px}
+.dmh-button{border:1px solid #545450;border-radius:4px;padding:9px 12px;background:#414140;color:#eeeeea;font:600 12px/1.4 Arial,sans-serif;cursor:pointer}.dmh-button:hover:not(:disabled){filter:brightness(1.15)}.dmh-button:disabled{opacity:.4;cursor:default}.dmh-button.green,.dmh-button.blue{background:#eeeeea;border-color:#eeeeea}.dmh-button.red{background:#3b2524;border-color:#60302c;color:#e99792}
+#dmh-summary{color:#a0a09a;font-size:12px}#dmh-list{flex:1;min-height:0;overflow:auto;background:#343433;border:1px solid #ffffff13;border-radius:4px;padding:4px}.dmh-row{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #ffffff13;min-height:68px}.dmh-row:last-child{border-bottom:0}.dmh-av,.dmh-fallback{width:38px;height:38px;border-radius:50%;flex:0 0 38px}.dmh-av{object-fit:cover}.dmh-fallback{display:flex;align-items:center;justify-content:center;background:#eeeeea;font-weight:700}.dmh-main{flex:1;min-width:0}.dmh-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dmh-sub{font-size:11px;color:#a0a09a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.dmh-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.dmh-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:#2a2a28;color:#aaa9a5}
+#dmh-footer{border-top:1px solid #ffffff13;padding-top:14px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12px}#dmh-page{color:#aaa9a5}#dmh-page-input{width:56px;height:34px;background:#3a3a39;color:#eeeeea;border:1px solid #50504d;border-radius:4px;padding:4px;text-align:center}#dmh-folder{display:none}
+
+#dmh-panel .dmd-view-title{margin-bottom:5px}#dmh-search{font:inherit}#dmh-list{min-height:100px}.dmh-row:hover{background:#ffffff04}.dmh-button{font-weight:500;font-family:inherit}.dmh-confirm-box{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+
+.dmh-button.green,.dmh-button.blue{color:#2c2c2b}
+
+#dmh-summary:empty{display:none}
+.dmh-select{width:15px;height:15px;flex:none;margin:0;accent-color:#8b85ed;cursor:pointer}

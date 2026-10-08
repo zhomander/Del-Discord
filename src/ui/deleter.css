@@ -1,0 +1,106 @@
+#dmd-toolbar-btn{width:32px!important;height:32px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border:0!important;border-radius:4px!important;background:transparent!important;color:var(--interactive-normal,#aaa)!important;cursor:pointer!important;padding:0!important;margin:0 2px!important}
+#dmd-toolbar-btn:hover{background:#ffffff0d!important;color:#fff!important}
+#dmd-panel{--bg:#2c2c2b;--surface:#343433;--hover:#ffffff08;--line:#ffffff13;--text:#eeeeea;--muted:#a8a8a2;position:fixed;top:62px;right:18px;width:min(660px,calc(100vw - 36px));height:min(480px,calc(100vh - 80px));display:none;flex-direction:column;background:var(--bg);color:var(--text);border:1px solid #4b4b49;border-radius:8px;box-shadow:0 20px 70px #0006;z-index:2147483646;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden;container-type:inline-size;color-scheme:dark}
+#dmd-panel *{box-sizing:border-box}
+#dmd-panel [hidden]{display:none!important}
+#dmd-tabs{display:flex;flex:none;align-items:center;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--line);background:#343433;position:relative}
+.dmd-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:#a5a5a2;font:500 12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:12px 13px;white-space:nowrap;cursor:pointer}
+.dmd-tab:hover{color:#eee;background:#ffffff06}
+.dmd-tab.active{color:#efefed;border-bottom-color:#d4d4d0}
+.dmd-view{flex:1 1 auto;min-height:0;overflow:auto;padding:28px 32px;scrollbar-width:thin;scrollbar-color:#484846 transparent}
+.dmd-view-title{margin:0 0 18px;font-size:25px;letter-spacing:-.6px;font-weight:650;line-height:1.3;color:#f0f0ec}
+.dmd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:20px 20px}
+.dmd-field{min-width:0}
+#dmd-thread-target{margin-bottom:20px}
+.dmd-field label{display:block;font-size:12px;font-weight:500;color:#aaa9a5;margin:0 0 7px}
+.dmd-field input[type=text],.dmd-field input[type=password],.dmd-field input[type=datetime-local],.dmd-field input[type=number],.dmd-field select,.dmd-field textarea{width:100%;min-width:0;border:1px solid #50504d;border-radius:4px;background:#3a3a39;color:#eeeeea;padding:8px 10px;font:inherit;outline:none;transition:border-color .15s}
+.dmd-field input{height:36px}
+.dmd-field input::placeholder,.dmd-field textarea::placeholder{color:#979790}
+#dmd-panel select:not([multiple]){appearance:none;-webkit-appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%239b9b98' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;height:36px}
+.dmd-field input+select,.dmd-field input+label{margin-top:8px}
+.dmd-field textarea{resize:vertical;line-height:1.6}
+.dmd-field input:focus,.dmd-field select:focus,.dmd-field textarea:focus{border-color:#8b85ed;box-shadow:0 0 0 2px #8b85ed22}
+#dmd-panel button:focus-visible,#dmd-panel summary:focus-visible,.dmd-help-label:focus-visible{outline:2px solid #8b85ed;outline-offset:3px}
+.dmd-check{display:flex!important;align-items:center;gap:8px;font-weight:400!important;margin:8px 0!important}
+.dmd-check input[type=checkbox]{width:14px;height:14px;flex:none;margin:0;accent-color:#8b85ed}
+.dmd-pattern-options{display:grid;grid-template-columns:60px minmax(0,1fr);gap:8px;align-items:start}
+.dmd-field>input+.dmd-pattern-options{margin-top:12px}
+.dmd-pattern-options input{text-align:center}
+.dmd-pattern-options input,.dmd-pattern-options select{margin-top:0!important}
+.dmd-btn{border:1px solid #545450;border-radius:4px;padding:8px 12px;background:#414140;color:#d8d8d3;font:500 12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;transition:background .15s}
+.dmd-btn:hover:not(:disabled){background:#4b4b49}
+.dmd-btn:disabled{opacity:.35;cursor:not-allowed}
+.dmd-green{background:#eeeeea;border-color:#eeeeea;color:#2c2c2b}.dmd-green:hover:not(:disabled){background:#ffffff}
+.dmd-red{color:#e99792;background:#3b2524;border-color:#60302c}.dmd-red:hover:not(:disabled){background:#4b2b29}
+.dmd-small{padding:2px 7px;font-size:10px;margin-left:5px}
+.dmd-actions{border-top:1px solid var(--line);margin-top:24px;padding-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dmd-muted,.dmd-note{color:#a0a09a;font-size:12px}.dmd-note{margin-top:10px}.dmd-wide{grid-column:1/-1}
+#dmd-panel .dmd-filter-group{margin-top:6px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;overflow:visible}
+#dmd-panel .dmd-filter-group summary{display:flex;align-items:center;gap:10px;padding:8px 3px;color:#c4c4bf;font-size:13px;font-weight:500;cursor:pointer;list-style:none}
+#dmd-panel .dmd-filter-group summary::-webkit-details-marker{display:none}
+#dmd-panel .dmd-filter-group summary::before{content:'';width:6px;height:6px;border-right:1.5px solid #878782;border-bottom:1.5px solid #878782;transform:rotate(-45deg);flex:none;margin-left:3px}
+#dmd-panel .dmd-filter-group[open] summary::before{transform:rotate(45deg);margin-top:-4px}
+#dmd-panel .dmd-filter-group summary:hover{background:var(--hover);border-radius:4px}
+.dmd-filter-group>.dmd-grid,.dmd-filter-group>.dmd-add-row{padding:12px 0 20px 20px}
+.dmd-scan-option{margin-top:20px}
+.dmd-add-row{display:flex;align-items:end;gap:10px}
+.dmd-add-row>input,.dmd-add-row>.dmd-field{flex:1;min-width:0}
+.dmd-add-row>.dmd-btn{flex:none;min-height:36px;white-space:nowrap}
+#dmd-multi-list{max-height:240px;overflow:auto;margin-top:22px;border:1px solid var(--line);border-radius:4px;background:#343433}
+.dmd-queue-row{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--line)}.dmd-queue-row:last-child{border-bottom:0}
+.dmd-queue-index{width:22px;color:#777773}.dmd-queue-info{flex:1;min-width:0}.dmd-queue-title{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dmd-queue-ids{font-size:11px;color:#858580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dmd-forum-list{margin-top:8px}#dmd-forum-list option{padding:8px}
+#dmd-progress-dock{flex:none;background:#343433;border-top:1px solid var(--line);padding:14px 24px 10px}
+#dmd-panel .dmd-progress-area progress{appearance:none;display:block;width:100%;height:4px;border:0;border-radius:2px;overflow:hidden;background:#50504d}
+#dmd-panel progress::-webkit-progress-bar{background:#50504d}#dmd-panel progress::-webkit-progress-value{background:#8b85ed}#dmd-panel progress::-moz-progress-bar{background:#8b85ed}
+.dmd-progress-meta{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:11px;color:#a0a09a}#dmd-multi-status:not(:empty){margin-top:6px;font-size:11px}
+#dmd-log{display:block;flex:0 0 126px;min-height:90px;max-height:26%;overflow:auto;background:#292928;border-top:1px solid var(--line);padding:10px 24px 14px;font:11px/1.65 Menlo,Consolas,monospace;white-space:pre-wrap;margin:0;scrollbar-width:thin}
+#dmd-log::before{content:'Logs';display:block;font:500 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#a4a49f;margin-bottom:8px}
+#dmd-log:empty::after{content:'No activity yet. Run an action to see updates here.';font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#91918a}
+.log-success{color:#88b99e}.log-error{color:#e99792}.log-warn{color:#d0b685}.log-info{color:#91b9ce}.log-verb{color:#a6a6a0}
+.dmd-help-label{position:relative;width:max-content;cursor:help}
+.dmd-help-icon{display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border:1px solid #777772;border-radius:50%;font-size:9px;margin-left:2px;color:#92928d}
+#dmd-panel .dmd-tooltip{position:absolute;left:0;bottom:calc(100% + 9px);width:225px;max-width:calc(100vw - 80px);padding:10px 12px;z-index:30;background:#414140;border:1px solid #565651;border-radius:5px;box-shadow:0 4px 16px #0007;color:#e4e4dc;font-size:12px;line-height:1.6;font-weight:400;white-space:normal;visibility:hidden;opacity:0;pointer-events:none}
+#dmd-panel .dmd-help-label:hover .dmd-tooltip,#dmd-panel .dmd-help-label:focus .dmd-tooltip{visibility:visible;opacity:1}
+#dmd-panel [data-resize-corner]{position:absolute;bottom:0;width:26px;height:26px;z-index:20;touch-action:none}
+#dmd-resize-handle{right:0;cursor:nwse-resize}#dmd-resize-left{left:0;cursor:nesw-resize}
+#dmd-panel [data-resize-corner]::after{content:'';position:absolute;bottom:6px;width:9px;height:9px;border-bottom:2px solid #979790}
+#dmd-resize-handle::after{right:6px;border-right:2px solid #979790}#dmd-resize-left::after{left:6px;border-left:2px solid #979790}
+#dmd-panel [data-resize-corner]:hover::after{border-color:#eeeeea}
+.dmd-confirm-overlay{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:2147483647;padding:20px}.dmd-confirm-box{width:min(560px,calc(100vw - 40px));max-height:calc(100vh - 40px);overflow:auto;background:#343433;color:#eeeeea;border:1px solid #545450;border-radius:6px;box-shadow:0 18px 60px #0008;padding:24px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dmd-confirm-title{font-size:19px;font-weight:600;margin-bottom:10px}.dmd-confirm-message{color:#aaa9a2;white-space:pre-wrap}.dmd-confirm-details{margin:16px 0 0;background:#2c2c2b;border:1px solid #484845;border-radius:4px;padding:12px;max-height:280px;overflow:auto;color:#aaa9a2;font:12px/1.5 Menlo,Consolas,monospace;white-space:pre-wrap}.dmd-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+@container(max-width:700px){#dmd-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding-right:24px}.dmd-tab{padding:10px 5px;font-size:12px}.dmd-view{padding:22px 24px}}
+@container(max-width:440px){.dmd-grid{grid-template-columns:1fr}.dmd-add-row{flex-wrap:wrap}.dmd-view{padding:18px}.dmd-filter-group>.dmd-grid{padding-left:12px}#dmd-log{flex-basis:100px}}
+/* Keep editable controls and resize handles inside their available space. */
+#dmd-panel input:not([type=checkbox]):not([type=file]),#dmd-panel select:not([multiple]){min-width:0;max-width:100%;height:36px;min-height:36px;max-height:36px}
+#dmd-panel textarea{width:100%;min-width:0;max-width:100%;min-height:90px;max-height:min(320px,40vh);resize:vertical;overflow:auto}
+#dmd-panel select[multiple]{width:100%;min-width:0;max-width:100%;min-height:100px;max-height:min(320px,40vh);overflow:auto}
+#dmd-panel #dmd-log{overflow-y:auto;overflow-x:hidden;overflow-wrap:anywhere}
+
+#dmd-panel .dmd-actions+.dmd-field{margin-top:20px}
+#dmd-panel .dmd-native-select{display:none!important}
+#dmd-panel .dmd-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;height:36px;padding:8px 10px;border:1px solid #50504d;border-radius:4px;background:#3a3a39;color:#eeeeea;font:inherit;text-align:left;cursor:pointer}
+#dmd-panel .dmd-select-trigger span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dmd-panel .dmd-select-trigger::after{content:'';width:6px;height:6px;border-right:1.5px solid #a8a8a2;border-bottom:1.5px solid #a8a8a2;transform:rotate(45deg);margin:0 3px 3px;flex:none}
+#dmd-panel .dmd-select-trigger:hover,#dmd-panel .dmd-select-trigger[aria-expanded=true]{background:#414140;border-color:#72726d}
+#dmd-panel input+.dmd-native-select+.dmd-select-trigger{margin-top:8px}
+.dmd-select-menu{position:fixed;z-index:2147483647;overflow-y:auto;padding:5px;background:#414140;border:1px solid #565651;border-radius:6px;box-shadow:0 8px 30px #0006;color:#eeeeea;font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;scrollbar-width:thin}
+.dmd-select-menu button{display:block;width:100%;text-align:left;border:0;border-radius:3px;padding:8px 26px 8px 9px;background:transparent;color:inherit;font:inherit;cursor:pointer;position:relative}
+.dmd-select-menu button:hover,.dmd-select-menu button:focus{background:#ffffff0e;outline:none}.dmd-select-menu button[aria-selected=true]::after{content:'✓';position:absolute;right:9px;color:#b0aafa}.dmd-select-menu button:disabled{opacity:.4;cursor:default}
+#dmd-panel .dmd-identity-label{display:flex;align-items:center;gap:7px;min-height:20px}
+#dmd-panel .dmd-identity-avatar{position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#55554f;color:#eeeeea;font-size:10px;overflow:hidden;flex:none}
+#dmd-panel .dmd-identity-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* Confirmations dim only this tool, keeping Discord outside it unobscured. */
+#dmd-panel>.dmd-confirm-overlay{position:absolute;inset:0;padding:18px;border-radius:inherit}
+#dmd-panel .dmd-confirm-box{width:min(560px,100%);max-height:100%;min-width:0}
+#dmd-panel .dmd-field>select+.dmd-pattern-options,#dmd-panel .dmd-select-trigger+.dmd-pattern-options{margin-top:12px}
+#dmd-panel .dmd-segments{display:flex;gap:4px;padding:4px;background:#343433;border:1px solid #4b4b49;border-radius:6px;margin-bottom:22px;flex-wrap:wrap}
+#dmd-panel .dmd-segments button{flex:1;border:0;border-radius:4px;background:transparent;color:#a8a8a2;padding:7px 10px;font:500 12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
+#dmd-panel .dmd-segments button.active{background:#50504d;color:#eeeeea}#dmd-panel .dmd-segments button:hover{color:#eeeeea}
+#dmd-panel .dmd-subview{margin-top:24px}
+#dmd-panel #dmd-tabs{display:flex;flex-wrap:nowrap}#dmd-panel .dmd-tab{flex:1}
+.dmd-calendar{position:fixed;z-index:2147483647;width:290px;max-height:calc(100vh - 16px);overflow:auto;padding:12px;background:#414140;color:#eeeeea;border:1px solid #565651;border-radius:6px;box-shadow:0 8px 30px #0006;font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.dmd-calendar button{border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;padding:6px;cursor:pointer}.dmd-calendar button:hover,.dmd-calendar button:focus-visible{background:#ffffff12;outline:1px solid #8b85ed}
+.dmd-calendar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.dmd-calendar-header span{font-weight:600}
+.dmd-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.dmd-calendar-grid span{color:#a8a8a2;font-size:11px;padding:4px}.dmd-calendar-grid .outside{color:#92928e}.dmd-calendar-grid .selected{background:#8b85ed;color:#fff}
+.dmd-calendar-time{display:flex;align-items:center;gap:6px;border-top:1px solid #565651;margin-top:10px;padding-top:10px}.dmd-calendar-time span{margin-right:auto}.dmd-calendar input{width:48px;padding:5px;background:#343433;color:#eeeeea;border:1px solid #565651;border-radius:4px;font:inherit}
+.dmd-calendar-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.dmd-calendar-footer button:last-child{background:#eeeeea;color:#2c2c2b;padding:6px 12px}

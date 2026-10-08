@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a problem with Del-Discord installation or cleanup.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing reports before opening a new one.
+        Never include your Discord authorization token or private message contents.
+  - type: input
+    id: version
+    attributes:
+      label: Del-Discord version
+      description: Find it in your userscript manager or the panel header.
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Firefox 143 / Chrome 140
+    validations:
+      required: true
+  - type: dropdown
+    id: manager
+    attributes:
+      label: Userscript manager
+      options:
+        - Tampermonkey
+        - Greasemonkey
+        - Violentmonkey
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: manager-version
+    attributes:
+      label: Userscript manager version
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Where does the problem happen?
+      options:
+        - Installation or missing toolbar buttons
+        - Message deletion
+        - Overwrite message text
+        - Oldest-first order or inverse filters
+        - Direct message IDs or package import
+        - Reaction removal
+        - Multi-delete queue
+        - DM history
+        - Exports
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a DM or channel
+        2. Select these options
+        3. Click this button
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Relevant errors or screenshots
+      description: Remove tokens, names, message text, and other private information before sharing.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked for an existing report of this problem.
+          required: true
+        - label: I installed the generated userscript and disabled overlapping scripts.
+          required: true
+        - label: I removed authorization tokens and private information from this report.
+          required: true
