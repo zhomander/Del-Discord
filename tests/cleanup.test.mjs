@@ -195,6 +195,7 @@ test('bundled UI passes oldest-first overwrite and inverse options to search', a
   dom.window.fetch = async (url, options) => {
     requests.push({ url, options });
     if (url.endsWith(`/channels/${channel}`)) return Response.json({ id: channel, type: 1 });
+    if (url.includes('/messages?')) return Response.json([]);
     return url.endsWith('/users/@me') ? Response.json({ id: 'self' }) : Response.json({ messages: [], total_results: 0 });
   };
   vm.runInContext(await readFile('dist/Del-Discord-v1.user.js', 'utf8'), dom.getInternalVMContext());
@@ -222,7 +223,7 @@ test('queue runs without confirmation, removes finished conversations and retain
     t.after(() => dom.window.close());
     const doc = dom.window.document;
     dom.window.localStorage.setItem('del_discord_v1_queue', JSON.stringify([{ guildId: '@me', channelId: channel, label: 'First' }, { guildId: '@me', channelId: '345678901234567890', label: 'Next' }]));
-    dom.window.fetch = async url => url.endsWith('/users/@me') ? Response.json({ id: 'self' }) : outcome === 'failure' ? new Response('', { status: 403 }) : Response.json({ messages: [], total_results: 0 });
+    dom.window.fetch = async url => url.endsWith('/users/@me') ? Response.json({ id: 'self' }) : outcome === 'failure' ? new Response('', { status: 403 }) : Response.json(url.includes('/messages?') ? [] : { messages: [], total_results: 0 });
     // Pause between conversations to verify the first is removed before the next starts.
     dom.window.setTimeout = () => 0;
     vm.runInContext(await readFile('dist/Del-Discord-v1.user.js', 'utf8'), dom.getInternalVMContext());
@@ -366,6 +367,7 @@ test('comma-separated channels scan separately and author filters preserve owner
   dom.window.fetch = async url => {
     if (url.endsWith('/users/@me')) return Response.json({ id: me });
     if (/\/channels\/\d+$/.test(url)) return Response.json({ id: url.split('/').at(-1), type: 1 });
+    if (url.includes('/messages?')) return Response.json([]);
     searches.push(url); return Response.json({ messages: [], total_results: 0 });
   };
   vm.runInContext(await readFile('dist/Del-Discord-v1.user.js', 'utf8'), dom.getInternalVMContext());
@@ -384,7 +386,7 @@ test('DM history multi-selection confirms deletion and cancellation prevents any
   t.after(() => dom.window.close());
   const doc = dom.window.document, requests = [];
   dom.window.localStorage.setItem('del_discord_v1_history', JSON.stringify({ first: { channelId: channel, name: 'First', verifiedSent: true, sentCount: 2 }, second: { channelId: '345678901234567890', name: 'Second', verifiedSent: true, sentCount: 3 } }));
-  dom.window.fetch = async url => { requests.push(url); return url.endsWith('/users/@me') ? Response.json({ id: 'self' }) : Response.json({ messages: [], total_results: 0 }); };
+  dom.window.fetch = async url => { requests.push(url); return url.endsWith('/users/@me') ? Response.json({ id: 'self' }) : Response.json(url.includes('/messages?') ? [] : { messages: [], total_results: 0 }); };
   vm.runInContext(await readFile('dist/Del-Discord-v1.user.js', 'utf8'), dom.getInternalVMContext());
   doc.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
   doc.querySelector('#dmd-token').value = 'test-token';
@@ -411,6 +413,7 @@ test('a second cleanup during a run prompts to queue without starting overlappin
   const doc = dom.window.document;
   let finishSearch, requests = 0;
   dom.window.fetch = async url => {
+    if (url.includes('/messages?')) return Response.json([]);
     if (url.endsWith('/users/@me')) return Response.json({ id: 'self' });
     if (/\/channels\/\d+$/.test(url)) return Response.json({ id: url.split('/').at(-1), type: 1 });
     requests++;

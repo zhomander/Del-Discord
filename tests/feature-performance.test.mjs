@@ -62,7 +62,7 @@ test('search uses exclusive cursors and page deduplication for overlapping resul
     });
     const result = await deleteMessages({ ...base, order, collectAll: true, progress: (done, total, phase) => { if (phase === 'Scanning') scans.push(done); } });
     assert.equal(result.deleted, 3); assert.equal(result.skipped, 0);
-    assert.deepEqual(writes, ids); assert.deepEqual(scans, [2, 3]);
+    assert.deepEqual(writes, ids); assert.deepEqual(scans, [0, 2, 3]);
   }
 });
 

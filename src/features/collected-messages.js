@@ -9,7 +9,10 @@ export async function runCollectedMessages(messages, options, stats) {
   if (stopCheck()) return { stopped: true, ...stats };
   const ordered = sortMessages(messages, options.order);
   log('success', `Scan complete: ${ordered.length} matching messages collected. No messages changed during scanning.`);
-  if (!ordered.length) return { done: true, ...stats };
+  if (!ordered.length) {
+    log('info', 'No messages matched the selected author, channels, dates and filters. Start again to scan for new messages.');
+    return { done: true, ...stats };
+  }
   if (!options.skipConfirm && !await confirmMessages(ordered, options, ordered.length)) return { cancelled: true, ...stats };
   const readMessage = createMessageReader(token, log, stopCheck);
   for (const [index, snapshot] of ordered.entries()) {

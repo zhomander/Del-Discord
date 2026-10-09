@@ -13,7 +13,7 @@ async function waitFor(check) {
 async function mount(t, fetch, initial = []) {
   const dom = new JSDOM('<header><div role="toolbar"></div></header>', { url: `https://discord.com/channels/${guild}/${first}`, runScripts: 'outside-only', pretendToBeVisual: true });
   t.after(() => dom.window.close());
-  dom.window.fetch = fetch;
+  dom.window.fetch = (url, options) => url.endsWith('/threads/active') ? Promise.resolve(Response.json({ threads: [] })) : url.includes('/messages?') || url.endsWith(`/guilds/${guild}/channels`) ? Promise.resolve(Response.json([])) : fetch(url, options);
   dom.window.setTimeout = callback => { callback(); return 0; };
   dom.window.localStorage.setItem('del_discord_v1_queue', JSON.stringify(initial));
   Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetParent', { get() { return this.parentElement; } });
