@@ -23,8 +23,10 @@ for (const file of ['.github/workflows/ci.yml', '.github/workflows/release.yml',
     if (fields.some(field => !field.id) || new Set(fields.map(field => field.id)).size !== fields.length) throw new Error(`${file}: missing or duplicate field IDs`);
   }
 }
-const bundle = await readFile('dist/Del-Discord-v1.user.js', 'utf8');
-parse(bundle, { ecmaVersion: 'latest', sourceType: 'script' });
-if (!bundle.startsWith('// ==UserScript==')) throw new Error('Missing userscript header');
-if ((bundle.match(/\/\/ ==UserScript==/g) || []).length !== 1) throw new Error('Duplicate userscript headers');
+for (const file of ['dist/Del-Discord-v1.user.js', 'dist/Del-Discord.greasyfork.user.js']) {
+  const bundle = await readFile(file, 'utf8');
+  parse(bundle, { ecmaVersion: 'latest', sourceType: 'script' });
+  if (!bundle.startsWith('// ==UserScript==')) throw new Error('Missing userscript header');
+  if ((bundle.match(/\/\/ ==UserScript==/g) || []).length !== 1) throw new Error('Duplicate userscript headers');
+}
 console.log('All modules, the standalone userscript, and GitHub configuration parse successfully.');

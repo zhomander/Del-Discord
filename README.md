@@ -1,19 +1,21 @@
-# Del-Discord — Installation guide
+# Del-Discord
 
-[![Version: v2.1.0][version-badge]][script]
+[![Version: v2.1.1][version-badge]][script]
 [![License: MIT][license-badge]][license]
-[![Discord website][platform-badge]][discord]
 
-**Install Del-Discord in your browser to access message cleanup and DM history.**
+[![Install from Greasy Fork][greasyfork-button]][greasyfork] [![Manual Script][manual-button]][script]
 
-[**Get the userscript**][script] · [Greasy Fork][greasyfork] *(not published yet)* · [Installation help](#installation-help)
-
-> [!WARNING]
-> Del-Discord automates actions on your user account. Discord prohibits this type of automation (self-bots), and using it may result in account suspension or termination. Randomized delays do not guarantee protection from detection. Read [Discord’s self-bot policy](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots) before installing. Use at your own risk.
+[![Installation Help][help-button]](#installation-help)
 
 ---
 
-## Install Del-Discord
+## Demo
+
+[![Del-Discord demo showing message cleanup and reaction removal][demo-preview]][demo-video]
+
+---
+
+## Installation Guide
 
 ### 1. Install a userscript manager
 
@@ -27,31 +29,23 @@ Skip this step if you already have one installed.
 
 ### 2. Get the script
 
-[![Get Del-Discord v2][install-badge]][script]
+[![Install from Greasy Fork][greasyfork-button]][greasyfork] [![Manual Script][manual-button]][script]
 
-Open **[Del-Discord-v1.user.js][script]** and copy the complete script. If viewing it on GitHub, select <kbd>Raw</kbd> first.
+### 3. Confirm installation
 
-> **Greasy Fork:** Del-Discord has not been published on [Greasy Fork][greasyfork] yet. Use the included script for now.
+Confirm installation in your userscript manager and enable Del-Discord.
 
-### 3. Save it in your manager
+**Manual alternative:** Open [Del-Discord-v1.user.js][script] and copy the complete script; select <kbd>Raw</kbd> if viewing it on GitHub. In your manager, select <kbd>Create a new script</kbd>, replace the default contents, and <kbd>Save</kbd>.
 
-Open your userscript manager and select <kbd>Create a new script</kbd>. Replace the default contents with Del-Discord, then <kbd>Save</kbd> and enable it.
+<img src="./.github/assets/allow-user-scripts.png" alt="Tampermonkey extension settings with Allow User Scripts enabled" width="760">
 
-If your browser asks, allow the extension to run userscripts and access Discord.
+Enable "Allow User Scripts" (if you've never used a userscript manager)
 
-### 4. Disable overlapping scripts
-
-Disable other Discord cleanup or DM history scripts if installed.
-
-### 5. Open Discord
+### 4. Open Discord & check the toolbar
 
 Open **[Discord][discord] in your browser**, refresh, and enter a DM or channel. This installation supports the Discord website; the desktop app is not supported.
 
-### 6. Check the toolbar
-
 Look for the <kbd>🗑️</kbd> button in the channel header. Open it to access Messages, Reactions, Queue, and DM History in one window.
-
-**Installing Del-Discord does not delete or overwrite messages.**
 
 ---
 
@@ -62,21 +56,27 @@ Look for the <kbd>🗑️</kbd> button in the channel header. Open it to access 
 | The buttons do not appear | Enable the manager and Del-Discord, allow access to Discord, then refresh. |
 | Your browser blocks userscripts | Enable the extension's userscript permission when prompted. |
 | Duplicate buttons appear | Disable overlapping Discord scripts, then refresh. |
-| You want to update | Replace the installed script with the new complete userscript and save. |
+| You want to update | Check for updates in your userscript manager, or replace a manually installed copy with the new complete userscript and save. |
 
 Still having installation trouble? [Open an installation bug report][bug-report]. Include your browser, manager, and script version; leave account tokens and private messages out of reports.
 
 ---
 
-[version-badge]: https://img.shields.io/badge/version-v2.1.0-5865F2?style=flat-square
+[version-badge]: https://img.shields.io/badge/version-v2.1.1-5865F2?style=flat-square
 [license-badge]: https://img.shields.io/badge/license-MIT-22C55E?style=flat-square
-[platform-badge]: https://img.shields.io/badge/platform-Discord%20website-5865F2?style=flat-square
-[install-badge]: https://img.shields.io/badge/Get_Del--Discord-v2.1.0-5865F2?style=for-the-badge
+[greasyfork-button]: ./.github/assets/install-greasyfork.svg
+[manual-button]: ./.github/assets/manual-script.svg
+[help-button]: ./.github/assets/installation-help.svg
 [script]: ./dist/Del-Discord-v1.user.js
 [license]: ./LICENSE
 [discord]: https://discord.com/channels/@me
-[greasyfork]: https://greasyfork.org/
+[greasyfork]: https://greasyfork.org/en/scripts/599469-del-discord
+[demo-preview]: ./.github/assets/demo.gif
+[demo-video]: ./.github/assets/demo.mp4
 [tampermonkey]: https://www.tampermonkey.net/
 [violentmonkey]: https://violentmonkey.github.io/
 [greasemonkey]: https://addons.mozilla.org/firefox/addon/greasemonkey/
 [bug-report]: https://github.com/zhomander/del-discord/issues/new?template=bugreport.yml
+
+> [!WARNING]
+> Del-Discord automates actions on your user account. Discord prohibits this type of automation (self-bots), and using it may result in account suspension or termination. Randomized delays do not guarantee protection from detection. Read [Discord’s self-bot policy](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots) before installing. Use at your own risk.
