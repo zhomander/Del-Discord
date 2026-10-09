@@ -265,6 +265,7 @@ test('bundled Messages controls forward regex, asset filters and preserve action
   dom.window.setTimeout = callback => { callback(); return 0; };
   const target = msg('200', { content: 'hello caption https://example.com/report.png' });
   dom.window.fetch = async (url, options) => {
+    if (url.includes('/messages?')) return Response.json([]);
     if (url.endsWith('/users/@me')) return Response.json({ id: 'self' });
     if (url.endsWith(`/channels/${channel}`)) return Response.json({ id: channel, type: 0, guild_id: guild });
     if (url.includes('/search')) return searchPage(page++ ? [] : [target, msg('100', { content: 'no match' })]);

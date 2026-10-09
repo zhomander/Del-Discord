@@ -101,6 +101,7 @@ export function initDeleter() {
   });
 
   const getCleanupOptions = channelId => normalizeCleanupOptions({
+    freshHistory: true,
     ...getRange(channelId),
     authorIds: parseIdList($('#dmd-author').value, 'Author(s)'),
     action: $('#dmd-action').value, order: $('#dmd-order').value,
@@ -353,7 +354,7 @@ export function initDeleter() {
         if (!/^\d{15,22}$/.test(String(channelId || ''))) throw new Error('This history entry has no valid DM channel.');
         $('#dmh-progress-status').textContent = `Cleaning ${index + 1}/${entries.length}`;
         const result = await deleteMessages({ token: identity.token, authorId: identity.user.id, guildId: '@me', channelId,
-          action: 'delete', pinnedMode: 'any', collectAll: true, log, stopCheck: () => runState.stopped });
+          action: 'delete', pinnedMode: 'any', collectAll: true, freshHistory: true, log, stopCheck: () => runState.stopped });
         if (!result?.done || result.failed > 0) break;
         completed.push(entry); $('#dmh-progress').value = index + 1; updatePercentage('#dmh-progress', '#dmh-pct');
       }
@@ -661,7 +662,7 @@ export function initDeleter() {
           detected = await resolveConversation({ token: identity.token, channelId: item.channelId, log, stopCheck: () => runState.multiStopped });
           if (detected.mode === 'forums') throw new Error('Open this forum in Messages and select its threads before queuing cleanup.');
         }
-        const result = await (item.kind === 'ids' ? runDirectMessages : (detected ? detected.mode === 'thread' : item.thread) ? cleanupForumThread : deleteMessages)({ ...itemOptions, token: identity.token, authorId: identity.user.id,
+        const result = await (item.kind === 'ids' ? runDirectMessages : (detected ? detected.mode === 'thread' : item.thread) ? cleanupForumThread : deleteMessages)({ ...itemOptions, freshHistory: true, token: identity.token, authorId: identity.user.id,
           guildId: detected?.guildId || item.guildId, channelId: ['ids', 'server'].includes(item.kind) ? undefined : item.channelId, targets: item.targets, allowAnyThread: detected ? detected.mode === 'thread' : item.allowAnyThread,
           skipConfirm: true, log, stopCheck: () => runState.multiStopped });
         if (result?.unauthorized) { runState.multiStopped = true; break; }

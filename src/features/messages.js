@@ -8,6 +8,7 @@ import { invalidateAuth } from '../discord/deleter-auth.js';
 import { normalizeCleanupOptions, matchesMessage, sortMessages, compareMessageIds } from './message-filters.js';
 import { emptyStats, statsText, confirmMessages, applyMessageAction } from './message-actions.js';
 import { runCollectedMessages } from './collected-messages.js';
+import { collectFreshMessages } from './fresh-messages.js';
 
 export async function deleteMessages(opts) {
   const stats = emptyStats();
@@ -21,7 +22,9 @@ export async function deleteMessages(opts) {
   let processed = 0;
   let scanned = 0;
   const collected = createMessageCollection(options.order);
-  log('success', `Started ${options.action} · ${options.order === 'asc' ? 'oldest first' : 'newest first'} · ${currentLabel()} (${guildId}/${channelId})`);
+  const newest = new Map();
+  progress(0, 1, 'Scanning');
+  log('success', `Started ${options.action} · ${options.order === 'asc' ? 'oldest first' : 'newest first'} · ${currentLabel()} (${guildId}/${channelId || 'all channels'})`);
 
   try {
     while (!stopCheck()) {
@@ -32,7 +35,7 @@ export async function deleteMessages(opts) {
         ['has', options.linkMode === 'with' ? 'link' : undefined], ['has', options.fileMode === 'with' ? 'file' : undefined],
         ['content', options.textMode === 'include' ? content : undefined], ['include_nsfw', includeNsfw ? 'true' : undefined],
       ]);
-      const search = await apiFetch(`${base}?${query}`, { headers: { Authorization: token } }, log, stopCheck);
+      const search = await apiFetch(`${base}?${query}`, { headers: { Authorization: token }, cache: 'no-store' }, log, stopCheck);
       if (stopCheck()) break;
       if (search.status === 202) {
         let body = {}; try { body = await search.json(); } catch {}
@@ -53,11 +56,21 @@ export async function deleteMessages(opts) {
         .filter(message => message && /^\d+$/.test(String(message.id || '')));
       total ??= Number(data.total_results || hits.length);
       if (!hits.length) {
+        if (options.freshHistory) {
+          await collectFreshMessages(options, newest, collected, stats, scanned);
+          return await runCollectedMessages(collected.finish(), options, stats);
+        }
         if (options.collectAll) return await runCollectedMessages(collected.finish(), options, stats);
         log('success', `Finished. ${statsText(stats)}`);
         return { done: true, ...stats };
       }
       const sorted = sortMessages(hits, options.order);
+      if (options.freshHistory) {
+        for (const message of sorted) {
+          const previous = newest.get(message.channel_id);
+          if (!previous || compareMessageIds(message.id, previous) > 0) newest.set(message.channel_id, message.id);
+        }
+      }
       const edge = sorted.at(-1).id;
       const cursor = options.order === 'asc' ? pageMinId : pageMaxId;
       if (cursor && (options.order === 'asc' ? compareMessageIds(edge, cursor) <= 0 : compareMessageIds(edge, cursor) >= 0)) {
