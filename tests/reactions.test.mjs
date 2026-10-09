@@ -48,3 +48,29 @@ test('invalid reaction filter fails before requesting Discord', async t => {
   await assert.rejects(removeReactions({ reactionIds: 'oops', log: () => {} }), /emoji IDs/);
   assert.equal(calls, 0);
 });
+
+test('reaction cleanup verifies the selected user and deletes only that user after preview', async t => {
+  const dom = new JSDOM('<div id="dmd-panel"></div>');
+  t.after(() => dom.window.close());
+  const user = '123456789012345678', message = '234567890123456789';
+  const requests = [];
+  for (const [key, value] of Object.entries({ document: dom.window.document, setTimeout: callback => { callback(); return 0; }, fetch: async (url, options) => {
+    requests.push({ url, method: options?.method });
+    if (options?.method === 'DELETE') return new Response(null, { status: 204 });
+    if (url.includes('/reactions/')) return Response.json([{ id: user }]);
+    return Response.json([{ id: message, content: 'Preview me', reactions: [{ emoji: { name: '👍' }, me: false }] }]);
+  } })) {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+    t.after(() => previous ? Object.defineProperty(globalThis, key, previous) : delete globalThis[key]);
+  }
+  const run = removeReactions({ token: 'test', channelId: message, scanLimit: 1, authorId: 'self', reactionAuthorId: `${user}, ${user}, 567890123456789012`, log: () => {} });
+  for (let i = 0; i < 100 && !dom.window.document.querySelector('.dmd-confirm-box'); i++) await new Promise(resolve => setImmediate(resolve));
+  assert.match(dom.window.document.querySelector('.dmd-confirm-details').textContent, /Preview me/);
+  assert.equal(requests.some(item => item.method === 'DELETE'), false);
+  dom.window.document.querySelector('.dmd-confirm-actions button:last-child').click();
+  await run;
+  assert.equal(requests.filter(item => item.method === 'DELETE').length, 1);
+  assert.equal(requests.at(-1).url.endsWith(`/${user}`), true);
+  assert.equal(new URL(requests[1].url).searchParams.get('after'), (BigInt(user) - 1n).toString());
+});

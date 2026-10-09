@@ -1,22 +1,29 @@
 // Preserve large integer IDs before JSON.parse can round them.
 export function parseIdJson(text) {
   const input = String(text).replace(/^\uFEFF/, '');
-  let output = '', inString = false;
+  const parts = [];
+  const number = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+  let copied = 0, inString = false;
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     if (inString) {
-      output += char;
-      if (char === '\\') { output += input[++i] || ''; }
+      if (char === '\\') i++;
       else if (char === '"') inString = false;
     } else if (char === '"') {
-      inString = true; output += char;
-    } else if (char === '-' || /\d/.test(char)) {
-      const number = input.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
-      if (!number) { output += char; continue; }
-      const token = number[0];
-      output += /^\d{16,}$/.test(token) ? JSON.stringify(token) : token;
+      inString = true;
+    } else if (char === '-' || (char >= '0' && char <= '9')) {
+      number.lastIndex = i;
+      const match = number.exec(input);
+      if (!match) continue;
+      const token = match[0];
+      if (/^\d{16,}$/.test(token)) {
+        parts.push(input.slice(copied, i), '"', token, '"');
+        copied = i + token.length;
+      }
       i += token.length - 1;
-    } else output += char;
+    }
   }
-  return JSON.parse(output);
+  if (!parts.length) return JSON.parse(input);
+  parts.push(input.slice(copied));
+  return JSON.parse(parts.join(''));
 }

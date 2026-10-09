@@ -2,7 +2,7 @@ import { createMessageCollection } from './message-collection.js';
 import { API } from '../config.js';
 import { apiFetch, RunStoppedError } from '../discord/api.js';
 import { rand, sleep } from '../utils/timing.js';
-import { normalizeCleanupOptions, matchesMessage } from './message-filters.js';
+import { normalizeCleanupOptions, matchesMessage, compareMessageIds } from './message-filters.js';
 import { emptyStats } from './message-actions.js';
 import { runCollectedMessages } from './collected-messages.js';
 
@@ -49,7 +49,8 @@ export async function listForumThreads({ token, forumId, includeArchived = true,
 export async function cleanupForumThread(opts) {
   const options = normalizeCleanupOptions({ ...opts, collectAll: true });
   const { channelId, log, stopCheck = () => false, progress = () => {} } = options;
-  const stats = emptyStats(), collected = createMessageCollection(options.order), seen = new Set();
+  const stats = emptyStats(), collected = createMessageCollection(options.order);
+  let scanned = 0;
   try {
     const thread = await readJson(`${API}/channels/${channelId}`, options);
     if (thread.id !== channelId || ![10, 11, 12].includes(thread.type)) throw new Error('Select an individual thread for thread cleanup.');
@@ -64,19 +65,21 @@ export async function cleanupForumThread(opts) {
       if (!batch.length) break;
       const valid = batch.filter(message => /^\d+$/.test(String(message.id || '')));
       if (valid.length !== batch.length) throw new Error('Thread page contains invalid message IDs. No messages changed.');
-      const oldest = valid.reduce((value, message) => BigInt(message.id) < BigInt(value) ? message.id : value, valid[0].id);
-      if (before && BigInt(oldest) >= BigInt(before)) throw new Error('Thread history did not advance. No messages changed.');
+      const oldest = valid.reduce((value, message) => compareMessageIds(message.id, value) < 0 ? message.id : value, valid[0].id);
+      if (before && compareMessageIds(oldest, before) >= 0) throw new Error('Thread history did not advance. No messages changed.');
       const matching = [];
+      const pageSeen = new Set();
       for (const message of valid) {
-        if (seen.has(message.id)) continue;
-        seen.add(message.id);
+        if (pageSeen.has(message.id) || (before && compareMessageIds(message.id, before) >= 0)) continue;
+        pageSeen.add(message.id);
+        scanned++;
         if (matchesMessage(message, options)) matching.push(message);
         else stats.skipped++;
       }
       collected.add(matching);
-      progress(seen.size, seen.size, 'Scanning thread');
-      log('verb', `Scanned ${seen.size} messages in ${thread.name || channelId}; collected ${collected.length} matches.`);
-      if (options.minId && BigInt(oldest) <= BigInt(options.minId)) break;
+      progress(scanned, scanned, 'Scanning thread');
+      log('verb', `Scanned ${scanned} messages in ${thread.name || channelId}; collected ${collected.length} matches.`);
+      if (options.minId && compareMessageIds(oldest, options.minId) <= 0) break;
       before = oldest;
       if (!stopCheck()) await sleep(rand(900, 1500));
     }

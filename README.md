@@ -1,6 +1,6 @@
 # Del-Discord — Installation guide
 
-[![Version: v1.0.0][version-badge]][script]
+[![Version: v2.0.0][version-badge]][script]
 [![License: MIT][license-badge]][license]
 [![Discord website][platform-badge]][discord]
 
@@ -27,7 +27,7 @@ Skip this step if you already have one installed.
 
 ### 2. Get the script
 
-[![Get Del-Discord v1][install-badge]][script]
+[![Get Del-Discord v2][install-badge]][script]
 
 Open **[Del-Discord-v1.user.js][script]** and copy the complete script. If viewing it on GitHub, select <kbd>Raw</kbd> first.
 
@@ -68,10 +68,10 @@ Still having installation trouble? [Open an installation bug report][bug-report]
 
 ---
 
-[version-badge]: https://img.shields.io/badge/version-v1.0.0-5865F2?style=flat-square
+[version-badge]: https://img.shields.io/badge/version-v2.0.0-5865F2?style=flat-square
 [license-badge]: https://img.shields.io/badge/license-MIT-22C55E?style=flat-square
 [platform-badge]: https://img.shields.io/badge/platform-Discord%20website-5865F2?style=flat-square
-[install-badge]: https://img.shields.io/badge/Get_Del--Discord-v1.0.0-5865F2?style=for-the-badge
+[install-badge]: https://img.shields.io/badge/Get_Del--Discord-v2.0.0-5865F2?style=for-the-badge
 [script]: ./dist/Del-Discord-v1.user.js
 [license]: ./LICENSE
 [discord]: https://discord.com/channels/@me

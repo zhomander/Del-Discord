@@ -55,7 +55,7 @@
 #dmd-panel progress::-webkit-progress-bar{background:#50504d}#dmd-panel progress::-webkit-progress-value{background:#8b85ed}#dmd-panel progress::-moz-progress-bar{background:#8b85ed}
 .dmd-progress-meta{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:11px;color:#a0a09a}#dmd-multi-status:not(:empty){margin-top:6px;font-size:11px}
 #dmd-log{display:block;flex:0 0 126px;min-height:90px;max-height:26%;overflow:auto;background:#292928;border-top:1px solid var(--line);padding:10px 24px 14px;font:11px/1.65 Menlo,Consolas,monospace;white-space:pre-wrap;margin:0;scrollbar-width:thin}
-#dmd-log::before{content:'Logs';display:block;font:500 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#a4a49f;margin-bottom:8px}
+
 #dmd-log:empty::after{content:'No activity yet. Run an action to see updates here.';font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#91918a}
 .log-success{color:#88b99e}.log-error{color:#e99792}.log-warn{color:#d0b685}.log-info{color:#91b9ce}.log-verb{color:#a6a6a0}
 .dmd-help-label{position:relative;width:max-content;cursor:help}
@@ -104,3 +104,34 @@
 .dmd-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.dmd-calendar-grid span{color:#a8a8a2;font-size:11px;padding:4px}.dmd-calendar-grid .outside{color:#92928e}.dmd-calendar-grid .selected{background:#8b85ed;color:#fff}
 .dmd-calendar-time{display:flex;align-items:center;gap:6px;border-top:1px solid #565651;margin-top:10px;padding-top:10px}.dmd-calendar-time span{margin-right:auto}.dmd-calendar input{width:48px;padding:5px;background:#343433;color:#eeeeea;border:1px solid #565651;border-radius:4px;font:inherit}
 .dmd-calendar-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.dmd-calendar-footer button:last-child{background:#eeeeea;color:#2c2c2b;padding:6px 12px}
+
+.dmd-queue-avatar{width:32px;height:32px;flex:0 0 32px;border-radius:50%;background:var(--surface);display:grid;place-items:center;position:relative;overflow:hidden;color:var(--muted)}
+.dmd-queue-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+.dmd-channel-picker{position:relative;min-width:0}.dmd-channel-menu{position:fixed;z-index:2147483647;overflow:auto;padding:10px;background:#343433;color:#eeeeea;border:1px solid #565651;border-radius:6px;box-shadow:0 8px 30px #0006;font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark}.dmd-channel-menu[hidden]{display:none!important}.dmd-channel-menu input[type=search]{width:100%;padding:8px;border:1px solid #565651;border-radius:4px;background:#393938;color:inherit;font:inherit}.dmd-channel-menu input[type=checkbox]{width:14px;height:14px;accent-color:#8b85ed}.dmd-channel-choices{max-height:220px;overflow:auto;margin:8px 0;scrollbar-width:thin}.dmd-channel-option{display:flex!important;align-items:center;gap:9px;padding:7px 4px;margin:0!important;color:#eeeeea!important;cursor:pointer}.dmd-channel-option input{flex:0 0 auto}.dmd-channel-option span{overflow-wrap:anywhere}.dmd-channel-option:hover{background:#ffffff08}
+
+.dmd-channel-menu [hidden]{display:none!important}
+
+.dmd-orange{background:#bd7945;border-color:#cc8b56;color:#fff8f0}.dmd-orange:hover:not(:disabled){background:#ce8951}
+
+.dmd-start-value{margin-top:10px}
+
+.dmd-export-list{display:flex;flex-direction:column;gap:10px;max-height:200px;overflow:auto;margin:14px 0}.dmd-export-formats{border:1px solid #545450;border-radius:4px;display:flex;gap:20px;padding:10px 12px}.dmd-export-formats legend{color:#aaa9a2}
+
+#dmd-panel #dmd-log{scrollbar-color:#61615c #292928;scrollbar-gutter:stable;overscroll-behavior:contain}
+#dmd-panel #dmd-log::-webkit-scrollbar{width:10px}
+#dmd-panel #dmd-log::-webkit-scrollbar-track{background:transparent;margin:8px 0 26px}
+#dmd-panel #dmd-log::-webkit-scrollbar-thumb{background:#61615c;border:3px solid #292928;border-radius:10px;min-height:28px}
+#dmd-panel #dmd-log::-webkit-scrollbar-thumb:hover{background:#85857d}
+#dmd-panel #dmd-log::-webkit-scrollbar-thumb:active{background:#a4a49b}
+#dmd-panel #dmd-log::-webkit-scrollbar-button{display:none;width:0;height:0}
+#dmd-panel #dmd-log::-webkit-scrollbar-corner{background:transparent}
+@supports selector(::-webkit-scrollbar){#dmd-panel #dmd-log{scrollbar-width:auto;scrollbar-color:auto}}
+
+.dmd-scan-option{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}#dmd-panel .dmd-progress-area{height:48px}.dmd-progress-meta{min-height:16px}#dmd-multi-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
+
+#dmd-panel .dmd-tooltip{width:260px;white-space:pre-line;line-height:1.75;padding:12px 14px}#dmd-reactions>.dmd-grid{gap:12px 16px}#dmd-reactions .dmd-start-value{margin-top:8px}
+
+#dmd-rx-start-field{display:grid;grid-template-columns:minmax(100px,.8fr) minmax(0,1.2fr);gap:0 8px}#dmd-rx-start-field>label{grid-column:1/-1}#dmd-rx-start-field .dmd-start-value{margin-top:0;min-width:0}#dmd-rx-start-date-field>label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+#dmd-log-area{display:flex;flex-direction:column;flex:0 0 150px;min-height:110px;max-height:30%;background:#292928;border-top:1px solid var(--line)}.dmd-log-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 24px;color:#a4a49f;font-size:11px}.dmd-log-toolbar>div{display:flex;gap:6px}.dmd-log-toolbar .dmd-btn{padding:3px 8px;min-height:24px;background:transparent;border-color:transparent;color:#b6b6ae}.dmd-log-toolbar .dmd-btn:hover{background:#ffffff0b;border-color:#50504d}#dmd-log-area #dmd-log{flex:1;min-height:0;max-height:none;border-top:0;padding-top:4px}

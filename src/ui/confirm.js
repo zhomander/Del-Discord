@@ -1,6 +1,6 @@
 // Del-Discord v1 — personal source modules.
 
-export function askPopup({ title = 'Confirm', message = '', details = '', yesText = 'Yes', noText = 'No', danger = false } = {}) {
+export function askPopup({ title = 'Confirm', message = '', details = '', yesText = 'Yes', noText = 'No', danger = false, render, getResult, onNo } = {}) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'dmd-confirm-overlay';
@@ -36,6 +36,7 @@ export function askPopup({ title = 'Confirm', message = '', details = '', yesTex
     yes.className = `dmd-btn ${danger ? 'dmd-red' : 'dmd-green'}`;
     yes.textContent = yesText;
 
+    render?.({ box, yes });
     actions.append(no, yes);
     box.appendChild(actions);
     overlay.appendChild(box);
@@ -54,15 +55,19 @@ export function askPopup({ title = 'Confirm', message = '', details = '', yesTex
       document.removeEventListener('keydown', onKey, true);
       overlay.remove();
       if (previousFocus?.isConnected) previousFocus.focus();
-      resolve(value);
+      resolve(value && getResult ? getResult() : value);
     };
     const onKey = e => {
-      if (e.key === 'Tab') { e.preventDefault(); (document.activeElement === yes ? no : yes).focus(); }
+      if (e.key === 'Tab') {
+        const controls = [...box.querySelectorAll('button,input,select,[tabindex="0"]')].filter(node => !node.disabled);
+        const index = controls.indexOf(document.activeElement);
+        e.preventDefault(); controls[(index + (e.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
+      }
       if (e.key === 'Escape') finish(false);
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) finish(true);
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !yes.disabled) finish(true);
     };
 
-    no.onclick = () => finish(false);
+    no.onclick = () => { onNo?.(); finish(false); };
     yes.onclick = () => finish(true);
     overlay.onclick = e => { if (e.target === overlay) finish(false); };
     document.addEventListener('keydown', onKey, true);

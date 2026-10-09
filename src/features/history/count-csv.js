@@ -18,7 +18,9 @@ export async function countCsvMessages(file) {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        consume(decoder.decode(value, { stream: true }));
+        for (let offset = 0; offset < value.length; offset += 64 * 1024) {
+          consume(decoder.decode(value.subarray(offset, offset + 64 * 1024), { stream: true }));
+        }
       }
       consume(decoder.decode());
     } finally { reader.releaseLock(); }

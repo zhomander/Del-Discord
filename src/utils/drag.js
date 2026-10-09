@@ -6,6 +6,25 @@ export function installPanelWindowControls({ panel, dragHandle = panel, resizeHa
   let ratio = null;
   let geometryReady = false;
 
+  const frameUpdates = apply => {
+    let queued = false, frame = null, point = null;
+    const flush = () => {
+      queued = false; frame = null;
+      if (!point) return;
+      const latest = point; point = null; apply(latest);
+    };
+    const move = event => {
+      point = { clientX: event.clientX, clientY: event.clientY };
+      if (typeof window.requestAnimationFrame !== 'function') { flush(); return; }
+      if (!queued) { queued = true; frame = window.requestAnimationFrame(flush); }
+    };
+    const finish = () => {
+      if (frame !== null) window.cancelAnimationFrame?.(frame);
+      flush();
+    };
+    return { move, finish };
+  };
+
   const readSaved = () => {
     try {
       const saved = JSON.parse(storage().getItem(storageKey) || 'null');
@@ -77,13 +96,14 @@ export function installPanelWindowControls({ panel, dragHandle = panel, resizeHa
     const r = panel.getBoundingClientRect();
     const startX = e.clientX, startY = e.clientY;
     const startLeft = r.left, startTop = r.top;
-    const move = ev => {
+    const { move, finish } = frameUpdates(ev => {
       const maxLeft = Math.max(EDGE, window.innerWidth - r.width - EDGE);
       const maxTop = Math.max(EDGE, window.innerHeight - r.height - EDGE);
       panel.style.left = `${Math.min(maxLeft, Math.max(EDGE, startLeft + ev.clientX - startX))}px`;
       panel.style.top = `${Math.min(maxTop, Math.max(EDGE, startTop + ev.clientY - startY))}px`;
-    };
+    });
     const up = () => {
+      finish();
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -103,7 +123,7 @@ export function installPanelWindowControls({ panel, dragHandle = panel, resizeHa
     const startX = e.clientX, startY = e.clientY;
     const fromLeft = handle.dataset.resizeCorner === 'left';
     const startW = r.width, startH = r.height;
-    const move = ev => {
+    const { move, finish } = frameUpdates(ev => {
       const maxWidth = fromLeft ? r.left + startW - EDGE : window.innerWidth - r.left - EDGE;
       const maxHeight = window.innerHeight - r.top - EDGE;
       const width = Math.max(Math.min(MIN_WIDTH, maxWidth), Math.min(maxWidth, startW + (ev.clientX - startX) * (fromLeft ? -1 : 1)));
@@ -112,8 +132,9 @@ export function installPanelWindowControls({ panel, dragHandle = panel, resizeHa
       panel.style.height = `${height}px`;
       ratio = width / height;
       if (fromLeft) panel.style.left = `${r.left + startW - width}px`;
-    };
+    });
     const up = () => {
+      finish();
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);

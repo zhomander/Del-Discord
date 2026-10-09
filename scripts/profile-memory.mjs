@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { createMessageCollection } from '../src/features/message-collection.js';
 import { performance } from 'node:perf_hooks';
 import { importPackage } from '../src/features/history/import-package.js';
@@ -48,4 +49,5 @@ if (scenario === 'scan') {
   result = { conversations: Object.keys(history).length, sentMessages: Object.values(history).reduce((sum, item) => sum + item.sentCount, 0) };
 }
 sample();
+if (process.argv.includes('--check') && scenario === 'scan') assert.ok(result.retainedHeapMiB <= 16, `Scan retained ${result.retainedHeapMiB.toFixed(2)} MiB; limit is 16 MiB.`);
 console.log(JSON.stringify({ scenario, ...result, elapsedMs: performance.now() - started, peakHeapMiB: peakHeap / 1048576, peakRssMiB: peakRss / 1048576 }, null, 2));

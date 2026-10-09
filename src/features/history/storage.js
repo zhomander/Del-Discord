@@ -24,6 +24,8 @@ export function loadState() {
 
 export function saveState(state) {
   try {
-    siteStorage().setItem(STATE_KEY, JSON.stringify(state));
+    const storage = siteStorage();
+    const serialized = JSON.stringify(state);
+    if (storage.getItem(STATE_KEY) !== serialized) storage.setItem(STATE_KEY, serialized);
   } catch (e) { console.warn('[DM History] State save failed', e); }
 }

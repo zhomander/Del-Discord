@@ -1,0 +1,35 @@
+import { checkUiPerformance } from './performance-limits.mjs';
+import { JSDOM } from 'jsdom';
+import { performance } from 'node:perf_hooks';
+import { parseMessageIds } from '../src/features/message-ids.js';
+import { createQueue } from '../src/features/queue.js';
+import { createLog } from '../src/ui/log.js';
+import { enhanceSelects } from '../src/ui/select.js';
+import { enhanceCalendars } from '../src/ui/calendar.js';
+
+const dom = new JSDOM('<div id="dmd-panel"><label for="choice">Choice</label><select id="choice"><option>A</option><option>B</option></select><div><label for="date">Date</label><input id="date" type="datetime-local"></div><div id="dmd-multi-list"></div><span id="dmd-multi-count"></span><pre id="dmd-log"></pre></div>', { url: 'https://discord.com' });
+Object.assign(globalThis, { document: dom.window.document, window: dom.window, localStorage: dom.window.localStorage, Event: dom.window.Event });
+const $ = selector => globalThis.document.querySelector(selector), panel = $('#dmd-panel');
+const measure = async (name, work) => {
+  await new Promise(resolve => setImmediate(resolve));
+  globalThis.gc?.(); const baseline = process.memoryUsage().heapUsed, start = performance.now();
+  const value = work(), elapsedMs = performance.now() - start;
+  const temporaryHeapMiB = (process.memoryUsage().heapUsed - baseline) / 1048576;
+  await new Promise(resolve => setImmediate(resolve));
+  globalThis.gc?.();
+  const result = { name, elapsedMs: +elapsedMs.toFixed(1), temporaryHeapMiB: +temporaryHeapMiB.toFixed(2), retainedHeapMiB: +((process.memoryUsage().heapUsed - baseline) / 1048576).toFixed(2), ...value };
+  if (process.argv.includes('--check')) checkUiPerformance(result);
+  console.log(JSON.stringify(result));
+};
+const text = Array.from({length:10000}, (_, i) => (1440796733998370860n + BigInt(i)).toString()).join('\n');
+await measure('parse 10,000 IDs', () => ({ ids: parseMessageIds(text, '1440796733998370860').length }));
+const queue = createQueue({ $, log: () => {} });
+await measure('add 200 queue jobs', () => { queue.addQueueItems(Array.from({length:200}, (_, i) => ({ guildId:'@me', channelId:String(1440796733998370860n + BigInt(i)) }))); return { jobs:queue.getItems().length, storageBytes:Buffer.byteLength(localStorage.getItem('del_discord_v1_queue')) }; });
+const { log, logEntries } = createLog($('#dmd-log'));
+await measure('20,000 log updates', () => { for(let i=0;i<20000;i++) log('info', `Deleted message ${i}`); return { retainedEntries:logEntries.length, visibleRows:$('#dmd-log').childElementCount }; });
+enhanceSelects(panel); enhanceCalendars(panel);
+const cycle = count => { for(let i=0;i<count;i++){ $('#choice').nextElementSibling.click(); $('.dmd-select-menu button').click(); $('#date').nextElementSibling.click(); [...$('.dmd-calendar-footer').children].find(button => button.textContent === 'Cancel').click(); } };
+cycle(100);
+await measure('500 dropdown/calendar cycles', () => { cycle(500); return { openMenus: globalThis.document.querySelectorAll('.dmd-select-menu,.dmd-calendar').length }; });
+await measure('another 500 cycles', () => { cycle(500); return { openMenus: globalThis.document.querySelectorAll('.dmd-select-menu,.dmd-calendar').length }; });
+dom.window.close();

@@ -1,15 +1,18 @@
 {
   "name": "del-discord",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Personal local Discord deletion and DM history userscript",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
-    "test": "node --test",
+    "test": "node --test && npm run test:performance",
     "verify": "npm run lint && npm run build && npm run check && npm test",
     "lint": "eslint src scripts tests eslint.config.js --max-warnings=0",
-    "profile:memory": "node --expose-gc scripts/profile-memory.mjs"
+    "profile:memory": "node --expose-gc scripts/profile-memory.mjs",
+    "profile:ui": "node --expose-gc scripts/profile-ui.mjs",
+    "profile:exports": "node --expose-gc scripts/profile-export.mjs --compare",
+    "test:performance": "node --expose-gc scripts/profile-ui.mjs --check && node --expose-gc scripts/profile-memory.mjs scan --check && node --expose-gc scripts/profile-export.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

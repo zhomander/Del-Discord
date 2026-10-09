@@ -26,7 +26,7 @@ export function currentContext() {
 
 export function currentLabel() {
   const title = String(document.title || '')
-    .replace(/\s*\|\s*Discord.*$/i, '')
+    .replace(/^Discord\s*[|—–-]\s*/i, '').replace(/\s*\|\s*Discord.*$/i, '')
     .trim();
   const ctx = currentContext();
   if (!title || /^discord$/i.test(title)) {
