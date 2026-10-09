@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Del-Discord
 // @namespace    local.del-discord
-// @version      2.1.0
+// @version      2.1.1
 // @author       Del-Discord contributors
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjOTY5NjkwIiBkPSJNMTUgNFYySDl2MkgzdjJoMThWNGgtNlpNNSA3djEyYTIgMiAwIDAgMCAyIDJoMTBhMiAyIDAgMCAwIDItMlY3SDVabTYgMTBIOXYtNmgydjZabTQgMGgtMnYtNmgydjZaIi8+PC9zdmc+
 // @homepageURL  https://github.com/zhomander/del-discord

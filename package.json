@@ -1,10 +1,11 @@
 {
   "name": "del-discord",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "description": "Personal local Discord deletion and DM history userscript",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs && node scripts/build.mjs --greasyfork",
+    "build:greasyfork": "node scripts/build.mjs --greasyfork",
     "check": "node scripts/check.mjs",
     "test": "node --test && npm run test:performance",
     "verify": "npm run lint && npm run build && npm run check && npm test",

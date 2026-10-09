@@ -69,7 +69,7 @@ jobs:
       - name: Build, validate, and test
         run: npm run verify
       - name: Verify committed userscript
-        run: git diff --exit-code -- dist/Del-Discord-v1.user.js
+        run: git diff --exit-code -- dist/Del-Discord-v1.user.js dist/Del-Discord.greasyfork.user.js
 
   publish:
     name: Create release with verified files
@@ -110,6 +110,6 @@ jobs:
           if [ "$AUTOMATIC_RELEASE" != "true" ]; then flags+=(--verify-tag --draft); fi
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease --latest=false); fi
           gh release create "$RELEASE_TAG" \
-            dist/Del-Discord-v1.user.js LICENSE \
+            dist/Del-Discord-v1.user.js dist/Del-Discord.greasyfork.user.js LICENSE \
             --target "$RELEASE_SHA" --generate-notes "${flags[@]}" \
             --title "Del-Discord $RELEASE_TAG"
