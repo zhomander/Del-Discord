@@ -7,6 +7,7 @@ import { affinityEntries, avatarUrl, displayName, usernameOf, users } from '../d
 import { apiFetch } from '../discord/history-api.js';
 import { API } from '../config.js';
 import { merge, removeHistoryMatch } from '../features/history/model.js';
+import { createHistoryView } from '../features/history/view.js';
 import { sleep } from '../utils/timing.js';
 import { verifyPerson } from '../features/history/verify.js';
 import { importPackage } from '../features/history/import-package.js';
@@ -44,7 +45,9 @@ export function initHistory(container, { deleteConversations = async () => [] } 
   let page = Number.isInteger(stored.page) ? Math.max(0, stored.page) : 0;
   let query = typeof stored.query === 'string' ? stored.query : '';
   let packageInfo = stored.packageInfo && typeof stored.packageInfo === 'object' ? stored.packageInfo : null;
-  let me = null, visible = [], resolving = false, refreshing = false;
+  let me = null, visible = [], resolving = false, resolvePending = false, refreshing = false;
+  const nameAttempts = new WeakMap();
+  const historyView = createHistoryView();
   $('#dmh-search').value = query;
 
 
@@ -52,42 +55,48 @@ export function initHistory(container, { deleteConversations = async () => [] } 
   const sourceName = s => ({ open: 'Open DM', affinity: 'Closed/cache', package: 'Data Package' })[s] || s;
 
   function filteredItems() {
-    const q = query.trim().toLowerCase();
-    const verified = Object.values(history).filter(x => x?.verifiedSent === true && Number(x.sentCount || 0) > 0);
-    const filtered = q ? verified.filter(x => [x.name, x.username, x.userId, x.channelId].join(' ').toLowerCase().includes(q)) : verified;
-    filtered.sort((a, b) => {
-      const ar = Number.isFinite(a.dmRank) ? a.dmRank : 1e12, br = Number.isFinite(b.dmRank) ? b.dmRank : 1e12;
-      if (ar !== br) return ar - br;
-      return (a.name || a.username || a.userId || a.channelId).localeCompare(b.name || b.username || b.userId || b.channelId);
-    });
-    return filtered;
+    return historyView(history, query);
   }
 
   async function resolveVisibleUsers() {
-    if (resolving) return;
+    if (resolving) { resolvePending = true; return; }
     resolving = true;
+    resolvePending = false;
+    const resolvingHistory = history;
+    const resolvingVisible = visible;
     try {
-      if (!me) me = await identity();
-      if (!me) return;
       let changed = false;
-      for (const entry of visible) {
-        if (!entry.userId || (entry.name && entry.username && entry.avatar)) continue;
+      for (const entry of resolvingVisible) {
+        if (history !== resolvingHistory) break;
+        if (!visible.includes(entry) || !entry.userId || (entry.name && entry.username)) continue;
+        const attemptedAt = nameAttempts.get(entry);
+        if (attemptedAt !== undefined && Date.now() - attemptedAt < 60000) continue;
+        nameAttempts.set(entry, Date.now());
         let user = null;
+        let remoteLookup = false;
         try { user = users?.getUser?.(entry.userId) || null; } catch {}
         if (!user) {
+          if (!me) me = await identity();
+          if (!me || history !== resolvingHistory) break;
+          remoteLookup = true;
           try {
             const r = await apiFetch(`${API}/users/${entry.userId}`, { headers: { Authorization: me.token } });
             if (r.ok) user = await r.json();
           } catch {}
         }
+        if (history !== resolvingHistory) break;
         if (user) {
-          merge(history, { userId: entry.userId, name: displayName(user), username: usernameOf(user), avatar: avatarUrl(user), seenAt: new Date().toISOString() });
+          const resolved = merge(history, { userId: entry.userId, name: displayName(user), username: usernameOf(user), avatar: avatarUrl(user), seenAt: new Date().toISOString() });
+          nameAttempts.set(resolved, Date.now());
           changed = true;
         }
-        await sleep(50);
+        if (remoteLookup) await sleep(50);
       }
-      if (changed) { saveHistory(history); render(false); }
-    } finally { resolving = false; }
+      if (changed && history === resolvingHistory) { saveHistory(history); render(false); }
+    } finally {
+      resolving = false;
+      if (resolvePending) void resolveVisibleUsers();
+    }
   }
 
   function render(resolveNames = true) {
@@ -238,7 +247,7 @@ export function initHistory(container, { deleteConversations = async () => [] } 
     const pages = Math.max(1, Math.ceil(filteredItems().length / PAGE_SIZE));
     let requested = parseInt($('#dmh-page-input').value, 10);
     if (!Number.isFinite(requested)) requested = page + 1;
-    page = Math.max(1, Math.min(pages, requested)) - 1; persist(); render();
+    page = Math.max(1, Math.min(pages, requested)) - 1; render();
   }
 
   $('#dmh-delete-all').onclick = async () => {
@@ -253,12 +262,12 @@ export function initHistory(container, { deleteConversations = async () => [] } 
     } finally { deleting = false; render(false); }
   };
 
-  $('#dmh-search').oninput = e => { query = e.target.value || ''; page = 0; persist(); render(); };
+  $('#dmh-search').oninput = e => { query = e.target.value || ''; page = 0; render(); };
   $('#dmh-refresh').onclick = refreshLive;
   $('#dmh-import').onclick = () => $('#dmh-folder').click();
   $('#dmh-folder').onchange = e => importPackage(e.target.files, { $, getHistory: () => history, getIdentity: async () => me || (me = await identity()), setPackageInfo: value => { packageInfo = value; }, persist, render });
-  $('#dmh-prev').onclick = () => { page--; persist(); render(); };
-  $('#dmh-next').onclick = () => { page++; persist(); render(); };
+  $('#dmh-prev').onclick = () => { page--; render(); };
+  $('#dmh-next').onclick = () => { page++; render(); };
   $('#dmh-page-go').onclick = goToPage;
   $('#dmh-page-input').onkeydown = e => { if (e.key === 'Enter') goToPage(); };
   $('#dmh-clear').onclick = async () => {

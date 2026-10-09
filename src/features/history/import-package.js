@@ -1,4 +1,5 @@
 import { countCsvMessages } from './count-csv.js';
+import { countJsonMessages } from './count-json.js';
 // Del-Discord v1 — personal source modules.
 import { merge, recipientIds, removeHistoryMatch } from './model.js';
 import { saveHistory } from './storage.js';
@@ -49,21 +50,22 @@ export async function importPackage(fileList, { $, getHistory, getIdentity, setP
       }
     }
 
+    const sentCountsByFolder = new Map();
     const countSentMessages = async folder => {
-      const msgFiles = messageFilesByFolder.get(folder.toLowerCase()) || [];
+      const key = folder.toLowerCase();
+      if (sentCountsByFolder.has(key)) return sentCountsByFolder.get(key);
+      const msgFiles = messageFilesByFolder.get(key) || [];
       let total = 0;
 
       for (const { file, lower } of msgFiles) {
         try {
           if (lower.endsWith('.json')) {
-            const parsed = JSON.parse(await file.text() || '[]');
-            if (Array.isArray(parsed)) total += parsed.length;
-            else if (Array.isArray(parsed?.messages)) total += parsed.messages.length;
-            else if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) total += 1;
+            total += await countJsonMessages(file);
           } else total += await countCsvMessages(file);
-        } catch {}
+        } catch { sentCountsByFolder.set(key, null); return null; }
       }
 
+      sentCountsByFolder.set(key, total);
       return total;
     };
 
@@ -93,6 +95,7 @@ export async function importPackage(fileList, { $, getHistory, getIdentity, setP
       if (!direct || group) continue;
 
       const count = await countSentMessages(folder);
+      if (count === null) continue;
       if (count <= 0) {
         removeHistoryMatch(history, '', channelId);
         continue;

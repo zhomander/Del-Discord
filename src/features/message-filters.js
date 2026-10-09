@@ -52,9 +52,11 @@ export function matchesMessage(message, options) {
   if (!/^\d+$/.test(String(message.id || ''))) return false;
   if (options.minId && BigInt(message.id) <= BigInt(options.minId)) return false;
   if (options.maxId && BigInt(message.id) >= BigInt(options.maxId)) return false;
-  const hasLink = /https?:\/\/\S+/i.test(message.content || '') || (message.embeds || []).some(embed => !!embed.url);
   const matchMode = (mode, value) => mode === 'any' || (mode === 'with' ? value : !value);
-  if (!matchMode(options.linkMode, hasLink)) return false;
+  if (options.linkMode !== 'any') {
+    const hasLink = /https?:\/\/\S+/i.test(message.content || '') || (message.embeds || []).some(embed => !!embed.url);
+    if (!matchMode(options.linkMode, hasLink)) return false;
+  }
   if (!matchMode(options.fileMode, !!message.attachments?.length)) return false;
   if (!matchMode(options.pinnedMode, !!message.pinned)) return false;
   if (options.content) {
@@ -69,9 +71,19 @@ export function matchesMessage(message, options) {
   return true;
 }
 
+// Callers validate decimal IDs before sorting. Decimal length and lexical order
+// compare snowflakes exactly without allocating BigInts for every comparison.
+export function compareMessageIds(leftId, rightId) {
+  const left = String(leftId), right = String(rightId);
+  if (left === right) return 0;
+  if (left[0] === '0' || right[0] === '0') {
+    const a = BigInt(left), b = BigInt(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  return left.length === right.length ? (left < right ? -1 : 1) : (left.length < right.length ? -1 : 1);
+}
+
 export function sortMessages(messages, order) {
-  return [...messages].sort((a, b) => {
-    const comparison = BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0;
-    return order === 'asc' ? comparison : -comparison;
-  });
+  const direction = order === 'asc' ? 1 : -1;
+  return [...messages].sort((a, b) => direction * compareMessageIds(a.id, b.id));
 }

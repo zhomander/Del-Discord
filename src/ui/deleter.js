@@ -1,3 +1,7 @@
+import { installSavedSettings } from './saved-settings.js';
+import { trashIcon } from './trash-icon.js';
+import { installChannelPickers } from './channel-picker.js';
+import { createQueueIdentityResolver, cleanQueueLabel } from '../discord/queue-identity.js';
 import { createConversationPreviewResolver } from '../discord/conversation-preview.js';
 import { resolveConversation } from '../discord/conversation.js';
 import { apiFetch } from '../discord/api.js';
@@ -15,16 +19,17 @@ import { createQueue } from '../features/queue.js';
 import { installPanelWindowControls } from '../utils/drag.js';
 import { findDiscordToolbar } from '../discord/toolbar.js';
 import { observeDiscordPage } from '../discord/page-observer.js';
-import { downloadTextFile, safeFilePart, timeStampForFile } from '../utils/files.js';
+import { downloadBlob, downloadTextFile, safeFilePart, timeStampForFile } from '../utils/files.js';
+import { askExportSelection } from './export-selection.js';
 import { askPopup } from './confirm.js';
 import { runState } from '../utils/run-state.js';
-import { exportConversationData } from '../features/export.js';
+import { exportConversationData, conversationToBlob } from '../features/export.js';
 import { deleteMessages } from '../features/messages.js';
 import { listForumThreads, cleanupForumThread } from '../features/forum-threads.js';
 import { normalizeCleanupOptions } from '../features/message-filters.js';
 import { runDirectMessages } from '../features/direct-messages.js';
-import { parseMessageIds, importMessageIds, uniqueTargets } from '../features/message-ids.js';
-import { API, MAX_REACTION_SCAN } from '../config.js';
+import { parseMessageIds, importMessageIds } from '../features/message-ids.js';
+import { API, MAX_REACTION_SCAN, MAX_MESSAGE_IDS } from '../config.js';
 import { removeReactions } from '../features/reactions.js';
 import { rand, sleep } from '../utils/timing.js';
 import panelHtml from './deleter.html';
@@ -39,7 +44,7 @@ export function initDeleter() {
   btn.type = 'button';
   btn.title = 'Del-Discord v1 — Delete Messages';
   btn.setAttribute('aria-label', 'Delete Messages');
-  btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M15 4V2H9v2H3v2h18V4h-6ZM5 7v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7H5Zm6 10H9v-6h2v6Zm4 0h-2v-6h2v6Z"/></svg>`;
+  btn.innerHTML = trashIcon();
 
   const panel = document.createElement('div');
   panel.id = 'dmd-panel';
@@ -64,10 +69,16 @@ export function initDeleter() {
     return node;
   };
 
+  const savedSettings = installSavedSettings(panel, { getMode: () => messageMode, setMode: value => { messageMode = value; }, onReset: () => { syncViews(); fillContext(); }, onStorageError: () => log('warn', 'Messages settings could not be saved locally. Changes may be lost on refresh.') });
+  $('#dmd-clear-filters').onclick = savedSettings.clear;
   const history = initHistory(panel, { deleteConversations: entries => deleteHistoryConversations(entries) });
-  const identityPreviews = installIdentityPreviews($);
+  const identityCache = new Map();
+  const identityPreviews = installIdentityPreviews($, { cache: identityCache });
+  const reactionPreviews = installIdentityPreviews($, { author: '#dmd-rx-author', guild: '#dmd-rx-guild', userBadge: '#dmd-rx-user-avatar', guildBadge: '#dmd-rx-guild-avatar', cache: identityCache });
+  const queueServerPreview = installIdentityPreviews($, { author: null, guild: '#dmd-server-id', userBadge: null, guildBadge: '#dmd-server-avatar', cache: identityCache });
   enhanceSelects(panel);
   enhanceCalendars(panel);
+  const channelPickers = installChannelPickers($, () => messageMode !== 'thread');
   const logBox = $('#dmd-log');
   const { log, logEntries } = createLog(logBox);
 
@@ -85,8 +96,8 @@ export function initDeleter() {
   };
 
   const getRange = channelId => ({
-    minId: resolveBoundary($('#dmd-after-message').value, $('#dmd-after').value, channelId, 'After'),
-    maxId: resolveBoundary($('#dmd-before-message').value, $('#dmd-before').value, channelId, 'Before')
+    minId: resolveBoundary($('#dmd-after-kind').value === 'id' ? $('#dmd-after-message').value : '', $('#dmd-after-kind').value === 'date' ? $('#dmd-after').value : '', channelId, 'After'),
+    maxId: resolveBoundary($('#dmd-before-kind').value === 'id' ? $('#dmd-before-message').value : '', $('#dmd-before-kind').value === 'date' ? $('#dmd-before').value : '', channelId, 'Before')
   });
 
   const getCleanupOptions = channelId => normalizeCleanupOptions({
@@ -106,10 +117,11 @@ export function initDeleter() {
     $('#dmd-overwrite-field').hidden = $('#dmd-action').value !== 'overwrite';
 
   };
+  $('#dmd-action').onchange();
   let cleanupBusy = false;
   const setCleanupBusy = (busy, stopId) => {
     cleanupBusy = busy;
-    for (const id of ['#dmd-export-conversation', '#dmd-id-import', '#dmd-id-package', '#dmd-forum-load', '#dmd-forum-queue', '#dmd-multi-export', '#dmd-forum-export', '#dmh-refresh', '#dmh-import', '#dmh-clear']) $(id).disabled = busy;
+    for (const id of ['#dmd-export-conversation', '#dmd-id-import', '#dmd-id-package', '#dmd-forum-load', '#dmd-multi-export', '#dmd-forum-export', '#dmh-refresh', '#dmh-import', '#dmh-clear']) $(id).disabled = busy;
     $(stopId).disabled = !busy;
   };
 
@@ -139,7 +151,7 @@ export function initDeleter() {
       field.value = value; automaticFields.set(id, value);
     }
   };
-  for (const id of ['#dmd-guild', '#dmd-channel', '#dmd-rx-channel', '#dmd-multi-guild', '#dmd-multi-channel', '#dmd-forum-id']) {
+  for (const id of ['#dmd-guild', '#dmd-channel', '#dmd-rx-channel', '#dmd-rx-guild', '#dmd-forum-id']) {
     $(id).addEventListener('input', () => automaticFields.delete(id));
     $(id).addEventListener('change', () => automaticFields.delete(id));
   }
@@ -149,21 +161,21 @@ export function initDeleter() {
     fillAutomatic('#dmd-guild', ctx.guildId);
     fillAutomatic('#dmd-channel', ctx.channelId);
     fillAutomatic('#dmd-rx-channel', ctx.channelId);
-    fillAutomatic('#dmd-multi-guild', ctx.guildId);
-    fillAutomatic('#dmd-multi-channel', ctx.channelId);
-    $('#dmd-multi-current').value = `${currentLabel()} — ${ctx.guildId} / ${ctx.channelId}`;
+    fillAutomatic('#dmd-rx-guild', ctx.guildId);
+    void reactionPreviews.refresh('guild');
     if (ctx.guildId !== '@me') fillAutomatic('#dmd-forum-id', ctx.channelId);
     void identityPreviews.refresh('guild');
+    void channelPickers.refresh();
   };
   const resolvePreview = createConversationPreviewResolver();
   let detectionVersion = 0;
   const detectVisibleConversation = async () => {
     const channelId = $('#dmd-channel').value.trim(), token = $('#dmd-token').value.trim();
     const version = ++detectionVersion;
-    if (panel.style.display !== 'flex' || !token || !/^\d{15,22}$/.test(channelId) || cleanupBusy) return;
+    if (panel.style.display !== 'flex' || !token || !/^\d{15,22}$/.test(channelId) || cleanupBusy || messageMode === 'server') return;
     try {
       const detected = await resolvePreview({ token, channelId });
-      if (version !== detectionVersion || cleanupBusy || $('#dmd-channel').value.trim() !== channelId) return;
+      if (version !== detectionVersion || cleanupBusy || messageMode === 'server' || $('#dmd-channel').value.trim() !== channelId) return;
       messageMode = detected.mode;
       fillAutomatic('#dmd-guild', detected.guildId);
       if (detected.mode === 'forums') fillAutomatic('#dmd-forum-id', detected.channelId);
@@ -177,15 +189,38 @@ export function initDeleter() {
     $('#dmd-token').value = found.token;
     if (!$('#dmd-author').value.trim()) $('#dmd-author').value = found.user.id;
     identityPreviews.seedUser(found.user);
+    fillAutomatic('#dmd-rx-author', found.user.id);
+    void reactionPreviews.refresh('user');
+    void reactionPreviews.refresh('guild');
     void identityPreviews.refresh('user');
     void identityPreviews.refresh('guild');
+    void channelPickers.refresh();
     log('success', `Authorization loaded for ${found.user.username || 'your account'}.`);
     void detectVisibleConversation();
     return found;
   };
 
-  const queue = createQueue({ $, log });
-  const { renderQueue, addQueueItem } = queue;
+  const queueIdentities = createQueueIdentityResolver();
+  let refreshRunningQueue = null;
+  const queue = createQueue({ $, log, onChange: () => refreshRunningQueue?.() });
+  const { renderQueue } = queue;
+  let decoratingQueue = false;
+  const decoratedItems = new Set();
+  const hydrateQueueIcons = async () => {
+    const token = $('#dmd-token').value.trim();
+    if (!token || decoratingQueue || cleanupBusy) return;
+    decoratingQueue = true;
+    try {
+      for (const item of [...queue.getItems()]) {
+        if (cleanupBusy) break;
+        const key = `${item.guildId}/${item.channelId}`;
+        if (item.icon || item.kind === 'ids' || decoratedItems.has(key)) continue;
+        decoratedItems.add(key);
+        queue.updateIdentity(item, await queueIdentities.resolve(item, token, log));
+        await sleep(rand(350, 600));
+      }
+    } finally { decoratingQueue = false; }
+  };
 
 
   const panelWindow = installPanelWindowControls({ panel, dragHandle: panel, resizeHandles: [$('#dmd-resize-left'), $('#dmd-resize-handle')], storage: () => localStorage, storageKey: 'del_discord_v1_deleter_geometry_compact', defaultWidth: 660, defaultRatio: 660 / 480 });
@@ -201,7 +236,15 @@ export function initDeleter() {
     const open = panel.style.display === 'flex';
     panel.style.display = open ? 'none' : 'flex';
     btn.classList.toggle('open', !open);
-    if (!open) { panelWindow.ensureGeometry(); fillContext(); if (!$('#dmd-token').value) await loadIdentity(); else void detectVisibleConversation(); }
+    if (!open) {
+      panelWindow.ensureGeometry(); fillContext();
+      if (!$('#dmd-token').value) await loadIdentity(); else void detectVisibleConversation();
+      if (queue.getItems().length && !cleanupBusy) {
+        const continued = await askPopup({ title: 'Saved Queue', message: `${queue.getItems().length} queued cleanups are saved locally. Continue running them or clear the queue?`,
+          yesText: 'Continue', noText: 'Clear Queue', onNo: () => queue.clear() });
+        if (continued && !cleanupBusy) { panel.querySelector('[data-view="multi"]').click(); await $('#dmd-multi-start').onclick(); }
+      }
+    }
   };
 
   const syncViews = () => {
@@ -213,6 +256,8 @@ export function initDeleter() {
     $('#dmd-channel').previousElementSibling.textContent = messageMode === 'thread' ? 'Thread(s)' : 'Channel(s)';
     $('#dmd-channel').placeholder = messageMode === 'thread' ? 'Thread ID, thread ID' : 'Channel ID, channel ID';
     $('#dmd-thread-target').hidden = !threadMode;
+    $('#dmd-channel').closest('.dmd-field').hidden = messageMode === 'server';
+    $('#dmd-archived-option').hidden = messageMode !== 'forums';
     if (threadMode && $('#dmd-thread-target-kind').value !== messageMode) {
       $('#dmd-thread-target-kind').value = messageMode;
       $('#dmd-thread-target-kind').dispatchEvent(new Event('change'));
@@ -221,17 +266,19 @@ export function initDeleter() {
     $('#dmd-forums').style.display = messageMode === 'forums' ? '' : 'none';
     $('#dmd-messages > .dmd-actions').hidden = messageMode === 'forums';
     $('#dmd-queue-conversations').hidden = queueMode === 'ids';
+    $('#dmd-queue-server-inputs').hidden = queueMode !== 'server';
     $('#dmd-ids').style.display = queueMode === 'ids' ? '' : 'none';
     $('#dmh-panel').style.display = active === 'history' ? 'flex' : 'none';
     $('#dmd-progress-dock').hidden = false;
-    const progressView = active === 'multi' ? queueMode : active;
+    const progressView = active === 'multi' ? (queueMode === 'server' ? 'multi' : queueMode) : active;
     panel.querySelectorAll('[data-progress-view]').forEach(area => { area.hidden = area.dataset.progressView !== progressView; });
+    void channelPickers.refresh();
   };
   panel.querySelectorAll('.dmd-tab').forEach(tab => {
     tab.onclick = () => {
       panel.querySelectorAll('.dmd-tab').forEach(x => x.classList.toggle('active', x === tab)); syncViews();
       if (tab.dataset.view === 'history') history.activate();
-      if (tab.dataset.view === 'multi') renderQueue();
+      if (tab.dataset.view === 'multi') { renderQueue(); void hydrateQueueIcons(); }
     };
   });
   panel.querySelectorAll('#dmd-message-modes button').forEach(button => {
@@ -239,12 +286,12 @@ export function initDeleter() {
       messageMode = button.dataset.mode === 'forums' ? $('#dmd-thread-target-kind').value : button.dataset.mode;
 
 
-      void identityPreviews.refresh('guild'); syncViews();
+      void identityPreviews.refresh('guild'); syncViews(); savedSettings.save();
     };
   });
   $('#dmd-thread-target-kind').addEventListener('change', () => {
     messageMode = $('#dmd-thread-target-kind').value;
-    syncViews();
+    syncViews(); savedSettings.save();
   });
   panel.querySelectorAll('#dmd-queue-modes button').forEach(button => {
     button.onclick = () => {
@@ -255,21 +302,30 @@ export function initDeleter() {
   });
   syncViews();
 
-  let queuePromptOpen = false;
+  let queuePromptOpen = false, queuePromptDone = null;
   const offerQueue = async (items, options, allowAnyThread = false, targets = null) => {
     if (queuePromptOpen) return;
     if (!items.length && !targets?.length) return log('warn', 'Select at least one conversation or message ID.');
-    if (items.some(item => !item.guildId || !/^\d{15,22}$/.test(String(item.channelId || '')))) return log('error', 'Enter valid conversation IDs before adding to the queue.');
+    if (items.some(item => !item.guildId || !/^\d{15,22}$/.test(String(item.kind === 'server' ? item.guildId : item.channelId || '')))) return log('error', 'Enter valid conversation IDs before adding to the queue.');
     queuePromptOpen = true;
+    let finishPrompt;
+    queuePromptDone = new Promise(resolve => { finishPrompt = resolve; });
     try {
       const approved = await askPopup({ title: 'Add to Queue?', message: `Queue this ${options.action || 'delete'} cleanup with the selected filters? Starting the queue will run it without another confirmation.`,
         details: targets ? `${targets.length} message IDs` : items.map(item => item.label || item.channelId).join('\n'), yesText: 'Add to Queue', noText: 'Cancel' });
       if (!approved) return;
       const savedOptions = { ...options }; delete savedOptions.textPattern; delete savedOptions.assetPattern;
       if (targets) queue.addIdJob(targets, savedOptions);
-      else for (const item of items) addQueueItem(item.guildId, item.channelId, item.label, item.thread, { options: savedOptions, allowAnyThread, detectConversation: true });
-      log('info', 'Cleanup queued. Start Queue after the current action finishes.');
-    } finally { queuePromptOpen = false; }
+      else {
+        const jobs = [];
+        for (const item of items) {
+          const decorated = await queueIdentities.resolve(item, $('#dmd-token').value.trim(), log);
+          jobs.push({ ...decorated, options: savedOptions, allowAnyThread, detectConversation: item.kind !== 'server' });
+        }
+        queue.addQueueItems(jobs);
+      }
+      log('info', refreshRunningQueue ? 'Cleanup added to the running queue.' : 'Cleanup queued. Press Start Queue to begin.');
+    } finally { queuePromptOpen = false; finishPrompt(); queuePromptDone = null; }
   };
 
   const deleteHistoryConversations = async entries => {
@@ -316,7 +372,7 @@ export function initDeleter() {
     const header = [
       'Discord deletion log',
       `Exported: ${new Date().toISOString()}`,
-      `Guild: ${ctx?.guildId || $('#dmd-guild').value.trim() || ''}`,
+      `Server: ${ctx?.guildId || $('#dmd-guild').value.trim() || ''}`,
       `Channel: ${ctx?.channelId || $('#dmd-channel').value.trim() || ''}`,
       ''
     ].join('\n');
@@ -324,17 +380,23 @@ export function initDeleter() {
     downloadTextFile(`discord-log-${timeStampForFile()}.txt`, header + body);
   };
   // All export entry points share confirmation, cancellation, ranges, and download handling.
-  const exportConversations = async ({ targets, stopId, stopped, setStopped, progress, filename }) => {
+  const exportConversations = async ({ targets, stopId, stopped, setStopped, progress, filename, select = false }) => {
     if (cleanupBusy) return;
     let conversations;
     try { conversations = targets(); } catch (error) { return log('error', error.message); }
     if (!conversations.length) return log('warn', 'Select or queue at least one conversation to export.');
+    let format = 'json';
     setCleanupBusy(true, stopId); setStopped(false);
     try {
       const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
       if (!identity || stopped()) return;
+      if (select) {
+        const choice = await askExportSelection(conversations);
+        if (!choice || stopped()) return;
+        conversations = choice.conversations; format = choice.format;
+      }
       const ranges = conversations.map(item => getRange(item.channelId));
-      const approved = await askPopup({
+      const approved = select || await askPopup({
         title: conversations.length === 1 ? 'Export conversation?' : 'Export conversations?',
         message: `Export all readable messages in the selected Before/After range from ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}?`,
         details: conversations.map(item => item.label || item.channelId).join('\n'),
@@ -342,19 +404,28 @@ export function initDeleter() {
       });
       if (!approved || stopped()) return;
       const exports = [];
+      let messageCount = 0;
       progress(0, conversations.length);
       for (const [index, item] of conversations.entries()) {
         if (stopped()) return;
         const data = await exportConversationData({ token: identity.token, ...item,
           ...ranges[index], log, stopCheck: stopped });
         if (stopped()) return;
-        exports.push(data);
+        const blob = await conversationToBlob(data, { format, includeCsvHeader: index === 0, stopCheck: stopped });
+        if (stopped()) return;
+        messageCount += data.messageCount;
+        if (format === 'json' || blob.size) {
+          if (exports.length) exports.push(format === 'csv' ? '\r\n' : ',\n');
+          exports.push(blob);
+        }
         progress(index + 1, conversations.length);
       }
-      const data = exports.length === 1 ? exports[0] : { exportedAt: new Date().toISOString(), conversationCount: exports.length, conversations: exports };
-      downloadTextFile(`discord-${safeFilePart(filename)}-${timeStampForFile()}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
-      log('success', `Export complete: ${exports.length} conversations, ${exports.reduce((total, item) => total + item.messageCount, 0)} messages.`);
-    } catch (error) { log('error', error?.message || error); }
+      const blob = format === 'json' && conversations.length > 1
+        ? new Blob(['{\n  "exportedAt": ', JSON.stringify(new Date().toISOString()), ',\n  "conversationCount": ', String(conversations.length), ',\n  "conversations": [\n', ...exports, '\n  ]\n}'], { type: 'application/json;charset=utf-8' })
+        : new Blob(exports, { type: format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8' });
+      downloadBlob(`discord-${safeFilePart(filename)}-${timeStampForFile()}.${format}`, blob);
+      log('success', `Export complete: ${conversations.length} conversations, ${messageCount} messages.`);
+    } catch (error) { if (!stopped()) log('error', error?.message || error); }
     finally { setCleanupBusy(false, stopId); setStopped(false); }
   };
   $('#dmd-export-conversation').onclick = () => exportConversations({
@@ -367,9 +438,9 @@ export function initDeleter() {
     progress: setProgress, filename: `conversation-${currentLabel()}`,
   });
   $('#dmd-multi-export').onclick = () => exportConversations({
-    targets: () => queue.getItems().filter(item => item.kind !== 'ids').map(item => ({ ...item })),
+    targets: () => queue.getItems().filter(item => !['ids', 'server'].includes(item.kind)).map(item => ({ ...item })),
     stopId: '#dmd-multi-stop', stopped: () => runState.multiStopped, setStopped: value => { runState.multiStopped = value; },
-    progress: (value, max) => setMultiProgress(value, max, `Exported ${value}/${max}`), filename: 'queue-conversations',
+    progress: (value, max) => setMultiProgress(value, max, `Exported ${value}/${max}`), filename: 'queue-conversations', select: true,
   });
   $('#dmd-forum-export').onclick = () => exportConversations({
     targets: () => selectedThreads().map(thread => ({ guildId: thread.guild_id, channelId: thread.id, label: thread.name || thread.id })),
@@ -383,14 +454,49 @@ export function initDeleter() {
   $('#dmd-stop').onclick = () => { runState.stopped = true; log('warn', 'Stop requested...'); };
   $('#dmd-rx-stop').onclick = () => { runState.reactionStopped = true; log('warn', 'Stop requested...'); };
 
+  for (const side of ['after', 'before']) {
+    $(`#dmd-${side}-kind`).onchange = () => {
+      const date = $(`#dmd-${side}-kind`).value === 'date';
+      $(`#dmd-${side}-date-field`).hidden = !date;
+      $(`#dmd-${side}-id-field`).hidden = date;
+    };
+    $(`#dmd-${side}-kind`).onchange();
+  }
+  const queueMessageTargets = async (requestedChannels = null) => {
+    try {
+      fillContext();
+      if (messageMode === 'server') {
+        const guildId = $('#dmd-guild').value.trim();
+        if (!/^\d{15,22}$/.test(guildId)) throw new Error('Enter a server ID in Server.');
+        const guild = await queueIdentities.readGuild(guildId, $('#dmd-token').value.trim(), log);
+        return await offerQueue([{ kind: 'server', guildId, channelId: `server:${guildId}`, label: guild.name || guildId }], getCleanupOptions(''));
+      }
+      const context = currentContext();
+      const items = (requestedChannels || parseIdList($('#dmd-channel').value, 'Channel(s)', { required: true })).map(channelId => ({
+        guildId: $('#dmd-guild').value.trim(), channelId,
+        label: context?.channelId === channelId ? currentLabel() : channelId,
+        thread: messageMode === 'thread',
+      }));
+      return await offerQueue(items, getCleanupOptions(''), messageMode === 'thread');
+    } catch (error) { return log('error', error.message); }
+  };
+  $('#dmd-add-queue').onclick = () => queueMessageTargets();
+
   $('#dmd-start').onclick = async (_event, requestedChannels = null) => {
     fillContext();
-    if (cleanupBusy) { try { return await offerQueue((requestedChannels || parseIdList($('#dmd-channel').value, 'Channel(s)', { required: true })).map(channelId => ({ guildId: $('#dmd-guild').value.trim(), channelId, label: channelId, thread: messageMode === 'thread' })), getCleanupOptions(''), messageMode === 'thread'); } catch (error) { return log('error', error.message); } }
+    if (cleanupBusy) return queueMessageTargets(requestedChannels);
     setCleanupBusy(true, '#dmd-stop');
     runState.stopped = false;
     try {
       const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
       if (!identity || runState.stopped) return;
+      if (messageMode === 'server') {
+        const guildId = $('#dmd-guild').value.trim();
+        if (!/^\d{15,22}$/.test(guildId)) throw new Error('Enter a server ID in Server.');
+        await deleteMessages({ ...getCleanupOptions(''), guildId, token: identity.token, authorId: identity.user.id,
+          log, progress: setProgress, stopCheck: () => runState.stopped });
+        return;
+      }
       const channels = (requestedChannels || parseIdList($('#dmd-channel').value, 'Channel(s)', { required: true }));
       const options = channels.map(channelId => getCleanupOptions(channelId));
       const targets = [];
@@ -419,15 +525,38 @@ export function initDeleter() {
   };
 
   const singleChannel = () => { const channels = parseIdList($('#dmd-channel').value, 'Channel(s)'); return channels.length === 1 ? channels[0] : ''; };
-  let importedTargets = [];
+  const limitedIdTargets = targets => {
+    if (targets.length > MAX_MESSAGE_IDS) throw new Error(`Use at most ${MAX_MESSAGE_IDS} message IDs per batch. Split larger imports into smaller files.`);
+    return targets;
+  };
+  let idCountTimer;
+  const updateIdCount = () => {
+    clearTimeout(idCountTimer);
+    try {
+      const targets = parseMessageIds($('#dmd-id-input').value, singleChannel() || '000000000000000');
+      $('#dmd-id-count').textContent = `${targets.length.toLocaleString()} IDs`;
+    } catch (error) { $('#dmd-id-count').textContent = error.message; }
+  };
+  $('#dmd-id-input').addEventListener('input', () => {
+    clearTimeout(idCountTimer); idCountTimer = setTimeout(updateIdCount, 150);
+  });
   const importIds = async files => {
     if (cleanupBusy) return;
     $('#dmd-id-import').disabled = true; $('#dmd-id-package').disabled = true;
     try {
       if (!files?.length) return;
       const targets = await importMessageIds(files, singleChannel());
-      importedTargets = uniqueTargets([...importedTargets, ...targets]);
-      $('#dmd-id-count').textContent = `${importedTargets.length} imported IDs`;
+      const input = $('#dmd-id-input');
+      const existing = parseMessageIds(input.value, singleChannel() || '000000000000000');
+      const keys = new Set(existing.map(target => `${target.channelId}/${target.messageId}`));
+      const additions = targets.filter(target => !keys.has(`${target.channelId}/${target.messageId}`));
+      limitedIdTargets([...existing, ...additions]);
+      const appended = additions.map(target => `https://discord.com/channels/@me/${target.channelId}/${target.messageId}`).join('\n');
+      const next = input.value + (input.value && appended ? '\n' : '') + appended;
+      parseMessageIds(next, singleChannel() || '000000000000000');
+      input.value = next;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      updateIdCount();
       log('success', `Loaded ${targets.length} message IDs locally. No messages were changed.`);
     } catch (error) { log('error', error?.message || error); }
     finally {
@@ -440,16 +569,16 @@ export function initDeleter() {
   $('#dmd-id-files').onchange = event => importIds(event.target.files);
   $('#dmd-id-folder').onchange = event => importIds(event.target.files);
   $('#dmd-id-clear').onclick = () => {
-    importedTargets = []; $('#dmd-id-input').value = ''; $('#dmd-id-count').textContent = 'No imported IDs';
+    $('#dmd-id-input').value = ''; updateIdCount();
   };
   $('#dmd-id-stop').onclick = () => { runState.stopped = true; log('warn', 'Stop requested...'); };
   $('#dmd-id-start').onclick = async () => {
-    if (cleanupBusy) { try { const targets = uniqueTargets([...importedTargets, ...parseMessageIds($('#dmd-id-input').value, singleChannel())]); return await offerQueue([], getCleanupOptions(''), false, targets); } catch (error) { return log('error', error.message); } }
+    if (cleanupBusy) { try { const targets = limitedIdTargets(parseMessageIds($('#dmd-id-input').value, singleChannel())); return await offerQueue([], getCleanupOptions(''), false, targets); } catch (error) { return log('error', error.message); } }
     setCleanupBusy(true, '#dmd-id-stop'); runState.stopped = false;
     try {
       const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
       if (!identity || runState.stopped) return;
-      const targets = uniqueTargets([...importedTargets, ...parseMessageIds($('#dmd-id-input').value, singleChannel())]);
+      const targets = limitedIdTargets(parseMessageIds($('#dmd-id-input').value, singleChannel()));
       const options = getCleanupOptions('');
       await runDirectMessages({ ...options, token: identity.token, authorId: identity.user.id, targets, log,
         stopCheck: () => runState.stopped, progress: (value, max, phase) => {
@@ -461,6 +590,11 @@ export function initDeleter() {
     finally { setCleanupBusy(false, '#dmd-id-stop'); runState.stopped = false; }
   };
 
+  $('#dmd-rx-start-kind').onchange = () => {
+    const date = $('#dmd-rx-start-kind').value === 'date';
+    $('#dmd-rx-start-id-field').hidden = date;
+    $('#dmd-rx-start-date-field').hidden = !date;
+  };
   $('#dmd-rx-go').onclick = async () => {
     if (cleanupBusy) return log('warn', 'Wait for the current cleanup to finish before removing reactions.');
     setCleanupBusy(true, '#dmd-rx-stop'); $('#dmd-rx-go').disabled = true;
@@ -473,16 +607,28 @@ export function initDeleter() {
       const limit = Math.max(1, Math.min(MAX_REACTION_SCAN, parseInt($('#dmd-rx-limit').value, 10) || 1000));
       for (const channelId of channels) {
         if (runState.reactionStopped) break;
-        await removeReactions({ token: identity.token, channelId, startId: $('#dmd-rx-start').value.trim(), scanLimit: limit,
-          reactionIds: $('#dmd-rx-filter').value, skipOwn: $('#dmd-rx-skipown').checked, authorId: identity.user.id, log,
+        await removeReactions({ token: identity.token, channelId, startId: ($('#dmd-rx-start-kind').value === 'date' ? $('#dmd-rx-start-date') : $('#dmd-rx-start')).value.trim(), scanLimit: limit,
+          reactionAuthorId: $('#dmd-rx-author').value.trim(), reactionIds: $('#dmd-rx-filter').value, skipOwn: $('#dmd-rx-skipown').checked, authorId: identity.user.id, log,
           progress: (v, m, phase) => { $('#dmd-rx-progress').max = Math.max(1, m); $('#dmd-rx-progress').value = v; updatePercentage('#dmd-rx-progress', '#dmd-rx-pct'); $('#dmd-rx-phase').textContent = `${phase || ''} ${v}/${m}`; } });
       }
     } catch (error) { log('error', error?.message || error); }
     finally { setCleanupBusy(false, '#dmd-rx-stop'); $('#dmd-rx-go').disabled = false; runState.reactionStopped = false; }
   };
 
-  $('#dmd-multi-add-current').onclick = async () => { try { const c = currentContext(); if (!c) return log('error', 'Open a DM/channel first.'); await offerQueue([{ ...c, label: currentLabel() }], getCleanupOptions('')); } catch (error) { log('error', error.message); } };
-  $('#dmd-multi-add-manual').onclick = async () => { try { const items = parseIdList($('#dmd-multi-channel').value, 'Channel(s)', { required: true }).map(channelId => ({ guildId: $('#dmd-multi-guild').value, channelId })); await offerQueue(items, getCleanupOptions('')); } catch (error) { log('error', error.message); } };
+  const addServer = async guildId => {
+    try {
+      if (!/^\d{15,22}$/.test(guildId || '')) throw new Error('Enter a valid Server ID or open a server channel.');
+      const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
+      if (!identity) return;
+      const guild = await queueIdentities.readGuild(guildId, identity.token, log);
+      $('#dmd-server-id').value = guildId;
+      queueServerPreview.seedGuild(guild);
+      void queueServerPreview.refresh('guild');
+      await offerQueue([{ kind: 'server', guildId, channelId: `server:${guildId}`, label: guild.name || `Server ${guildId}` }], getCleanupOptions(''));
+    } catch (error) { log('error', error.message); }
+  };
+  $('#dmd-server-add').onclick = () => addServer($('#dmd-server-id').value.trim());
+  $('#dmd-server-current').onclick = () => addServer(currentContext()?.guildId);
   $('#dmd-multi-clear').onclick = async () => {
     if (queue.getItems().length) {
       const approved = await askPopup({ title: 'Clear queue?', message: `Remove all ${queue.getItems().length} queued conversations?`, yesText: 'Clear', noText: 'Cancel', danger: true });
@@ -492,18 +638,23 @@ export function initDeleter() {
   };
   $('#dmd-multi-stop').onclick = () => { runState.multiStopped = true; log('warn', 'Stopping queue...'); };
   $('#dmd-multi-start').onclick = async () => {
-    if (cleanupBusy) { try { return await offerQueue(queue.getItems().filter(item => item.kind !== 'ids'), getCleanupOptions('')); } catch (error) { return log('error', error.message); } }
+    if (cleanupBusy) return log('info', 'The queue will continue automatically as jobs are added.');
     if (!queue.getItems().length) return log('error', 'The queue is empty.');
     setCleanupBusy(true, '#dmd-multi-stop'); runState.multiStopped = false;
     try {
       const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
       if (!identity || runState.multiStopped) return;
       const options = getCleanupOptions('');
-      const runQueue = queue.getItems().map(item => ({ ...item }));
-      for (let index = 0; index < runQueue.length; index++) {
+      let completed = 0, activeItem = null;
+      refreshRunningQueue = () => {
+        const total = completed + queue.getItems().length;
+        setMultiProgress(completed, total, activeItem ? `Running ${completed + 1}/${total}: ${cleanQueueLabel(activeItem.label) || activeItem.channelId}` : `Finished ${completed}/${total}`);
+      };
+      refreshRunningQueue();
+      while (queue.getItems().length || queuePromptOpen) {
         if (runState.multiStopped) break;
-        const item = runQueue[index];
-        setMultiProgress(index, runQueue.length, `Running ${index + 1}/${runQueue.length}: ${item.label || item.channelId}`);
+        if (!queue.getItems().length) { await queuePromptDone; continue; }
+        const item = { ...queue.getItems()[0] }; activeItem = item; refreshRunningQueue();
         const itemOptions = item.options ? normalizeCleanupOptions(item.options) : options;
         let detected;
         if (item.detectConversation && item.kind !== 'ids') {
@@ -511,18 +662,19 @@ export function initDeleter() {
           if (detected.mode === 'forums') throw new Error('Open this forum in Messages and select its threads before queuing cleanup.');
         }
         const result = await (item.kind === 'ids' ? runDirectMessages : (detected ? detected.mode === 'thread' : item.thread) ? cleanupForumThread : deleteMessages)({ ...itemOptions, token: identity.token, authorId: identity.user.id,
-          guildId: detected?.guildId || item.guildId, channelId: item.kind === 'ids' ? undefined : item.channelId, targets: item.targets, allowAnyThread: detected ? detected.mode === 'thread' : item.allowAnyThread,
+          guildId: detected?.guildId || item.guildId, channelId: ['ids', 'server'].includes(item.kind) ? undefined : item.channelId, targets: item.targets, allowAnyThread: detected ? detected.mode === 'thread' : item.allowAnyThread,
           skipConfirm: true, log, stopCheck: () => runState.multiStopped });
         if (result?.unauthorized) { runState.multiStopped = true; break; }
         if (result?.cancelled || result?.stopped || result?.stalled || result?.httpStatus) { runState.multiStopped = true; break; }
         if (!result?.done || result.failed > 0) { runState.multiStopped = true; break; }
+        completed++; activeItem = null;
         queue.completeItem(item);
-        setMultiProgress(index + 1, runQueue.length, `Finished ${index + 1}/${runQueue.length}`);
-        if (index < runQueue.length - 1 && !runState.multiStopped) await sleep(rand(1400, 2400));
+        refreshRunningQueue();
+        if (queue.getItems().length && !runState.multiStopped) await sleep(rand(1400, 2400));
       }
-      log(runState.multiStopped ? 'warn' : 'success', runState.multiStopped ? 'Queue stopped.' : `Finished all ${runQueue.length} queued items.`);
+      log(runState.multiStopped ? 'warn' : 'success', runState.multiStopped ? 'Queue stopped.' : `Finished all ${completed} queued items.`);
     } catch (error) { log('error', error?.message || error); }
-    finally { setCleanupBusy(false, '#dmd-multi-stop'); runState.multiStopped = false; }
+    finally { refreshRunningQueue = null; setCleanupBusy(false, '#dmd-multi-stop'); runState.multiStopped = false; }
   };
 
   const forumTargetValue = () => {
@@ -530,24 +682,28 @@ export function initDeleter() {
     return forum && forum !== automaticFields.get('#dmd-forum-id') ? forum : $('#dmd-channel').value.trim() || forum;
   };
   let forumThreads = [];
+  let forumThreadsById = new Map();
   const selectedThreads = () => [...$('#dmd-forum-list').selectedOptions]
-    .map(option => forumThreads.find(thread => thread.id === option.value)).filter(Boolean);
+    .map(option => forumThreadsById.get(option.value)).filter(Boolean);
   const loadForumTargets = async (identity, forumId) => {
-    forumThreads = []; $('#dmd-forum-list').textContent = '';
+    forumThreads = []; forumThreadsById.clear(); $('#dmd-forum-list').textContent = '';
     forumThreads = await listForumThreads({ token: identity.token, forumId,
       includeArchived: $('#dmd-forum-archived').checked, log, stopCheck: () => runState.stopped });
+    forumThreadsById = new Map(forumThreads.map(thread => [thread.id, thread]));
+    const fragment = document.createDocumentFragment();
     for (const thread of forumThreads) {
       const option = document.createElement('option'); option.value = thread.id;
       option.textContent = `${thread.name || thread.id}${thread.thread_metadata?.archived ? ' · archived' : ''}${thread.thread_metadata?.locked ? ' · locked' : ''}`;
-      $('#dmd-forum-list').appendChild(option);
+      fragment.appendChild(option);
     }
+    $('#dmd-forum-list').appendChild(fragment);
     $('#dmd-forum-status').textContent = `${forumThreads.length} threads loaded`;
   };
   $('#dmd-forum-stop').onclick = () => { runState.stopped = true; log('warn', 'Stop requested...'); };
   $('#dmd-forum-load').onclick = async () => {
     if (cleanupBusy) return;
     setCleanupBusy(true, '#dmd-forum-stop'); runState.stopped = false;
-    forumThreads = []; $('#dmd-forum-list').textContent = '';
+    forumThreads = []; forumThreadsById.clear(); $('#dmd-forum-list').textContent = '';
     try {
       const identity = await resolveToken($('#dmd-token').value.trim()) || await loadIdentity();
       if (!identity || runState.stopped) return;

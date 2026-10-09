@@ -4,6 +4,7 @@ import { API } from '../config.js';
 import { apiFetch, RunStoppedError } from '../discord/api.js';
 import { invalidateAuth } from '../discord/deleter-auth.js';
 import { rand, sleep } from '../utils/timing.js';
+import { compareMessageIds } from './message-filters.js';
 
 export function compactReferencedMessage(message) {
   if (!message) return null;
@@ -68,7 +69,6 @@ export async function exportConversationData({ token, guildId, channelId, minId,
   try { if (afterSnowflake) afterBig = BigInt(afterSnowflake); } catch {}
 
   const messages = [];
-  const seen = new Set();
   let page = 0;
 
   log('info', `Exporting conversation ${label || channelId}...`);
@@ -95,15 +95,18 @@ export async function exportConversationData({ token, guildId, channelId, minId,
     if (!Array.isArray(batch) || !batch.length) break;
 
     page++;
+    const beforeBig = beforeSnowflake ? BigInt(beforeSnowflake) : null;
+    const seen = new Set();
     let oldest = null;
     let reachedAfter = false;
 
     for (const message of batch) {
+      if (!/^\d+$/.test(String(message?.id || ''))) continue;
       let idBig = null;
       try { idBig = BigInt(message.id); } catch {}
       if (idBig === null) continue;
-      if (beforeSnowflake && idBig >= BigInt(beforeSnowflake)) continue;
-      if (afterBig !== null && idBig !== null && idBig <= afterBig) {
+      if (beforeBig !== null && idBig >= beforeBig) continue;
+      if (afterBig !== null && idBig <= afterBig) {
         reachedAfter = true;
         continue;
       }
@@ -111,7 +114,7 @@ export async function exportConversationData({ token, guildId, channelId, minId,
         seen.add(message.id);
         messages.push(compactExportMessage(message));
       }
-      if (idBig !== null && (oldest === null || idBig < oldest)) oldest = idBig;
+      if (oldest === null || idBig < oldest) oldest = idBig;
     }
 
     log('verb', `Export page ${page}: ${messages.length} messages collected.`);
@@ -121,14 +124,7 @@ export async function exportConversationData({ token, guildId, channelId, minId,
     await sleep(rand(550, 900));
   }
 
-  messages.sort((a, b) => {
-    try {
-      const aa = BigInt(a.id), bb = BigInt(b.id);
-      return aa < bb ? -1 : aa > bb ? 1 : 0;
-    } catch {
-      return String(a.timestamp || '').localeCompare(String(b.timestamp || ''));
-    }
-  });
+  messages.sort((a, b) => compareMessageIds(a.id, b.id));
 
   return {
     exportedAt: new Date().toISOString(),
@@ -142,4 +138,67 @@ export async function exportConversationData({ token, guildId, channelId, minId,
     messageCount: messages.length,
     messages
   };
+}
+
+const csvColumns = ['guildId', 'channelId', 'conversation', 'id', 'timestamp', 'editedTimestamp', 'authorId', 'username', 'content', 'type', 'pinned', 'attachments', 'embeds', 'reactions', 'mentions', 'referencedMessage'];
+const nestedColumns = ['attachments', 'embeds', 'reactions', 'mentions', 'referencedMessage'];
+const csvCell = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+
+function* conversationCsvRows(conversations, includeHeader = true) {
+  if (includeHeader) yield csvColumns.map(csvCell).join(',');
+  for (const conversation of conversations) {
+    for (const message of conversation.messages) {
+      yield [conversation.guildId, conversation.channelId, conversation.label, message.id, message.timestamp,
+        message.editedTimestamp, message.author?.id, message.author?.username, message.content, message.type,
+        message.pinned, ...nestedColumns.map(key => JSON.stringify(message[key] ?? null))].map(csvCell).join(',');
+    }
+  }
+}
+
+export function conversationsToCsv(conversations) {
+  return [...conversationCsvRows(conversations)].join('\r\n');
+}
+
+function* conversationJsonParts(conversation) {
+  const { messages, ...metadata } = conversation;
+  const wrapper = JSON.stringify({ ...metadata, messages: [] }, null, 2);
+  yield wrapper.slice(0, -4) + '[\n';
+  for (let index = 0; index < messages.length; index++) {
+    yield (index ? ',\n' : '') + '    ' + JSON.stringify(messages[index]);
+  }
+  yield '\n  ]\n}';
+}
+
+function* conversationCsvParts(conversation, includeHeader) {
+  let first = true;
+  for (const row of conversationCsvRows([conversation], includeHeader)) {
+    yield (first ? '' : '\r\n') + row;
+    first = false;
+  }
+}
+
+// Serialize one conversation at a time. Blob chunks release large temporary
+// strings and the event loop gets a turn during long exports.
+export async function conversationToBlob(conversation, { format = 'json', includeCsvHeader = true, stopCheck = () => false } = {}) {
+  const parts = format === 'csv' ? conversationCsvParts(conversation, includeCsvHeader) : conversationJsonParts(conversation);
+  const blobs = [];
+  let chunks = [], size = 0, yieldedAt = performance.now();
+  const checkStopped = () => { if (stopCheck()) throw new RunStoppedError(); };
+  const flush = () => {
+    blobs.push(new Blob([chunks.join('')]));
+    chunks = []; size = 0;
+  };
+  checkStopped();
+  for (const part of parts) {
+    chunks.push(part); size += part.length;
+    if (size < 65536) continue;
+    checkStopped(); flush();
+    if (performance.now() - yieldedAt >= 8) {
+      await sleep(0);
+      checkStopped(); yieldedAt = performance.now();
+    }
+  }
+  checkStopped();
+  if (chunks.length) flush();
+  return new Blob(blobs, { type: format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8' });
 }

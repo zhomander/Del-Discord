@@ -16,7 +16,10 @@ export function timeStampForFile() {
 }
 
 export function downloadTextFile(filename, text, type = 'text/plain;charset=utf-8') {
-  const blob = new Blob([text], { type });
+  downloadBlob(filename, new Blob([text], { type }));
+}
+
+export function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

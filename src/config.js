@@ -1,10 +1,15 @@
-// Del-Discord v1 — personal source modules.
+// Del-Discord v2 — personal source modules.
 
 export const API = 'https://discord.com/api/v10';
 
 export const MAX_REACTION_SCAN = 5000;
 
+export const MAX_MESSAGE_IDS = 10000;
+export const MAX_MESSAGE_ID_TEXT = 1200000;
+
 export const QUEUE_KEY = 'del_discord_v1_queue';
+
+export const LOG_ENTRY_LIMIT = 10000;
 
 export const LOG_DOM_LIMIT = 600;
 

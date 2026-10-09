@@ -5,7 +5,7 @@ import { API } from '../config.js';
 import { apiFetch, RunStoppedError } from '../discord/api.js';
 import { rand, retryMs, sleep } from '../utils/timing.js';
 import { invalidateAuth } from '../discord/deleter-auth.js';
-import { normalizeCleanupOptions, matchesMessage, sortMessages } from './message-filters.js';
+import { normalizeCleanupOptions, matchesMessage, sortMessages, compareMessageIds } from './message-filters.js';
 import { emptyStats, statsText, confirmMessages, applyMessageAction } from './message-actions.js';
 import { runCollectedMessages } from './collected-messages.js';
 
@@ -19,7 +19,7 @@ export async function deleteMessages(opts) {
   let approved = skipConfirm;
   let total = null;
   let processed = 0;
-  const seen = new Set();
+  let scanned = 0;
   const collected = createMessageCollection(options.order);
   log('success', `Started ${options.action} · ${options.order === 'asc' ? 'oldest first' : 'newest first'} · ${currentLabel()} (${guildId}/${channelId})`);
 
@@ -60,21 +60,28 @@ export async function deleteMessages(opts) {
       const sorted = sortMessages(hits, options.order);
       const edge = sorted.at(-1).id;
       const cursor = options.order === 'asc' ? pageMinId : pageMaxId;
-      if (cursor && (options.order === 'asc' ? BigInt(edge) <= BigInt(cursor) : BigInt(edge) >= BigInt(cursor))) {
+      if (cursor && (options.order === 'asc' ? compareMessageIds(edge, cursor) <= 0 : compareMessageIds(edge, cursor) >= 0)) {
         log('error', 'Discord returned a page that did not advance. Stopping to avoid repeating messages.');
         return { stalled: true, ...stats };
       }
       if (options.order === 'asc') pageMinId = edge;
       else pageMaxId = edge;
-      const candidates = sorted.filter(message => !seen.has(message.id));
+      // Exclusive snowflake cursors rule out every earlier page. Only retain
+      // this page's IDs to deduplicate repeated hits without a growing run set.
+      const pageSeen = new Set();
+      const candidates = sorted.filter(message => {
+        if (pageSeen.has(message.id) || (cursor && (options.order === 'asc' ? compareMessageIds(message.id, cursor) <= 0 : compareMessageIds(message.id, cursor) >= 0))) return false;
+        pageSeen.add(message.id);
+        return true;
+      });
       const matching = candidates.filter(message => matchesMessage(message, options));
-      for (const message of candidates) seen.add(message.id);
+      scanned += candidates.length;
       stats.skipped += candidates.length - matching.length;
       processed += candidates.length - matching.length;
       if (options.collectAll) {
         collected.add(matching);
-        progress(seen.size, Math.max(total, seen.size), 'Scanning');
-        log('verb', `Scanned ${seen.size}; collected ${collected.length} matches. No messages changed.`);
+        progress(scanned, Math.max(total, scanned), 'Scanning');
+        log('verb', `Scanned ${scanned}; collected ${collected.length} matches. No messages changed.`);
         if (!stopCheck()) await sleep(rand(900, 1500));
         continue;
       }

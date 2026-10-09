@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { createMessageCollection } from '../src/features/message-collection.js';
 import { countCsvMessages } from '../src/features/history/count-csv.js';
 import { apiFetch } from '../src/discord/api.js';
+import { JSDOM } from 'jsdom';
+import { createLog } from '../src/ui/log.js';
+import { LOG_ENTRY_LIMIT, LOG_DOM_LIMIT } from '../src/config.js';
 
 const channel = '234567890123456789';
 
@@ -72,4 +75,15 @@ test('millisecond jitter includes both bounds and rejects biased random values',
   assert.equal(rand(700, 1600), 1600);
   assert.equal(rand(700, 1600), 823);
   assert.equal(sequence.length, 0);
+});
+
+test('long runs bound exported log entries and visible rows while preserving newest entries', t => {
+  const dom = new JSDOM('<pre id="log"></pre>'); const previous = globalThis.document;
+  globalThis.document = dom.window.document;
+  t.after(() => { if(previous) globalThis.document = previous; else delete globalThis.document; dom.window.close(); });
+  const box = globalThis.document.querySelector('#log'); const { log, logEntries } = createLog(box);
+  for(let i=0;i<LOG_ENTRY_LIMIT+500;i++) log('info', `entry ${i}`);
+  assert.ok(logEntries.length <= LOG_ENTRY_LIMIT); assert.ok(box.childElementCount <= LOG_DOM_LIMIT);
+  assert.equal(logEntries.at(-1).message, `entry ${LOG_ENTRY_LIMIT+499}`);
+  assert.equal(box.lastChild.textContent, logEntries.at(-1).message);
 });

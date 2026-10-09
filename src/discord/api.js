@@ -21,8 +21,13 @@ export async function apiFetch(url, options = {}, log = () => {}, stopCheck = ()
   const account = new Headers(options.headers).get('Authorization') || '';
   while (true) {
     if (stopCheck()) throw new RunStoppedError();
-    const cooldown = cooldowns.get(account);
-    if (cooldown) await cooldown;
+    let cooldown;
+    // A concurrent response can extend an account's pause while this caller
+    // waits. Recheck the shared pause before sending another request.
+    while ((cooldown = cooldowns.get(account))) {
+      await cooldown;
+      if (stopCheck()) throw new RunStoppedError();
+    }
     if (stopCheck()) throw new RunStoppedError();
     const response = await fetch(url, options);
     if (response.status !== 429) {

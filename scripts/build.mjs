@@ -1,14 +1,17 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build, transform } from 'esbuild';
+import { trashIcon } from '../src/ui/trash-icon.js';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const project = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
+const icon = `data:image/svg+xml;base64,${Buffer.from(trashIcon('#969690', 64)).toString('base64')}`;
 const header = `// ==UserScript==
-// @name         Del-Discord v1
+// @name         Del-Discord
 // @namespace    local.del-discord
 // @version      ${project.version}
 // @author       Del-Discord contributors
+// @icon         ${icon}
 // @homepageURL  https://github.com/zhomander/del-discord
 // @supportURL   https://github.com/zhomander/del-discord/issues
 // @license      MIT
@@ -31,7 +34,18 @@ const result = await build({
   format: 'iife',
   platform: 'browser',
   target: ['es2022'],
+  minify: true,
+  legalComments: 'none',
   loader: { '.html': 'text', '.css': 'text' },
+  plugins: [{
+    name: 'compact-styles',
+    setup(builder) {
+      builder.onLoad({ filter: /\.css$/ }, async args => ({
+        contents: (await transform(await readFile(args.path, 'utf8'), { loader: 'css', minify: true })).code,
+        loader: 'text',
+      }));
+    },
+  }],
   banner: { js: header + '/*\n' + license + '*/' },
   metafile: true,
   write: false,

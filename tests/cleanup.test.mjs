@@ -110,7 +110,7 @@ test('ID input deduplicates links and preserves numeric JSON snowflakes exactly'
   assert.deepEqual(parseMessageIds(`${id('789')}\n${link}`, channel), [{ channelId: channel, messageId: id('789') }]);
   assert.deepEqual(parseMessageIds(`{"channelId":${channel},"messages":[{"ID":${id('789')}}]}`), [{ channelId: channel, messageId: id('789') }]);
   assert.equal(parseIdJson('{"content":"escaped \\" 123456789012345678","id":234567890123456789}').id, '234567890123456789');
-  assert.throws(() => parseMessageIds('garbage', channel), /Invalid/);
+  assert.deepEqual(parseMessageIds('garbage', channel), []);
   assert.throws(() => parseMessageIds(id('789')), /Channel ID/);
 });
 
@@ -229,7 +229,7 @@ test('queue runs without confirmation, removes finished conversations and retain
     doc.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
     doc.querySelector('#dmd-token').value = 'test-token';
     doc.querySelector('[data-view="multi"]').click();
-    assert.equal(doc.querySelector('#dmd-progress-dock').nextElementSibling.id, 'dmd-log');
+    assert.equal(doc.querySelector('#dmd-progress-dock').nextElementSibling.id, 'dmd-log-area');
     assert.equal(doc.querySelector('[data-progress-view="multi"]').hidden, false);
     const run = doc.querySelector('#dmd-multi-start').onclick();
     assert.equal(doc.querySelector('.dmd-confirm-overlay'), null);
@@ -286,8 +286,8 @@ test('queue and selected forum exports share panel confirmations and keep queued
   t.after(() => dom.window.close());
   const doc = dom.window.document, downloads = [], requests = [];
   const forum = '456789012345678901', guild = '567890123456789012';
-  dom.window.Blob = class { constructor(parts) { this.parts = parts; } };
-  dom.window.URL.createObjectURL = blob => { downloads.push(JSON.parse(blob.parts.join(''))); return 'blob:test'; };
+  dom.window.Blob = Blob;
+  dom.window.URL.createObjectURL = blob => { downloads.push(blob.text().then(JSON.parse)); return 'blob:test'; };
   dom.window.URL.revokeObjectURL = () => {};
   dom.window.HTMLAnchorElement.prototype.click = () => {};
   dom.window.localStorage.setItem('del_discord_v1_queue', JSON.stringify([{ guildId: '@me', channelId: channel }, { guildId: '@me', channelId: '345678901234567890' }]));
@@ -305,9 +305,10 @@ test('queue and selected forum exports share panel confirmations and keep queued
   let popup = await confirmation(doc);
   assert.equal(popup.parentElement.parentElement.id, 'dmd-panel');
   assert.equal(popup.getAttribute('role'), 'dialog');
+  popup.querySelector('.dmd-export-list').previousElementSibling.click();
   popup.querySelectorAll('.dmd-confirm-actions button')[1].click();
   await run;
-  assert.equal(downloads[0].conversationCount, 2);
+  assert.equal((await downloads[0]).conversationCount, 2);
   assert.equal(JSON.parse(dom.window.localStorage.getItem('del_discord_v1_queue')).length, 2);
   assert.equal(doc.querySelector('#dmd-multi-pct').textContent, '100%');
   doc.querySelector('#dmd-forum-id').value = forum;
@@ -317,8 +318,8 @@ test('queue and selected forum exports share panel confirmations and keep queued
   popup = await confirmation(doc);
   popup.querySelectorAll('.dmd-confirm-actions button')[1].click();
   await forumRun;
-  assert.equal(downloads[1].channelId, channel);
-  assert.equal(downloads[1].label, 'Selected post');
+  assert.equal((await downloads[1]).channelId, channel);
+  assert.equal((await downloads[1]).label, 'Selected post');
   assert.equal(doc.querySelector('#dmd-pct').textContent, '100%');
   const cancelled = doc.querySelector('#dmd-multi-export').onclick();
   popup = await confirmation(doc);

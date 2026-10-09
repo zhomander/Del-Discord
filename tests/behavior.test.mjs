@@ -134,9 +134,12 @@ test('installed bundle mounts a shared window with history, supports queue editi
   assert.equal(doc.querySelector('#dmd-thread-target').hidden, true);
 
   assert.equal(doc.querySelector('#dmd-log').getAttribute('role'), 'log');
+  assert.equal(doc.querySelector('#dmd-clear').closest('#dmd-log-area') !== null, true);
+  assert.equal(doc.querySelector('#dmd-export-log').textContent, 'Export');
+  assert.equal(doc.querySelector('#dmd-clear').textContent, 'Clear');
   for (const id of ['dmd-regex-flags', 'dmd-asset-regex-flags']) {
     const tooltip = doc.getElementById(doc.getElementById(id).getAttribute('aria-describedby'));
-    assert.match(tooltip.textContent, /ignore case.*multiline.*newlines.*Unicode/);
+    assert.match(tooltip.textContent, /ignore case.*multiline.*newlines.*Unicode/s);
     assert.equal(tooltip.getAttribute('role'), 'tooltip');
   }
   doc.querySelector('[data-view="history"]').click();
@@ -146,17 +149,57 @@ test('installed bundle mounts a shared window with history, supports queue editi
   assert.equal(doc.querySelector('#dmh-panel').style.display, 'none');
   assert.equal(doc.querySelector('#dmd-multi-count').closest('.dmd-progress-area')?.querySelector('progress').id, 'dmd-multi-progress');
   assert.equal(doc.querySelector('#dmd-content').closest('details').open, false);
-  const add = doc.querySelector('#dmd-multi-add-current').onclick();
+  doc.querySelector('#dmd-message-modes [data-mode="server"]').click();
+  assert.equal(doc.querySelector('#dmd-channel').closest('.dmd-field').hidden, true);
+  doc.querySelector('#dmd-message-modes [data-mode="channel"]').click();
+  assert.equal(doc.querySelector('#dmd-channel').closest('.dmd-field').hidden, false);
+  assert.equal(doc.querySelector('#dmd-forum-archived').closest('.dmd-scan-option') !== null, true);
+  for (const side of ['after', 'before']) {
+    const kind = doc.querySelector(`#dmd-${side}-kind`);
+    kind.value = 'id'; kind.dispatchEvent(new dom.window.Event('change'));
+    assert.equal(doc.querySelector(`#dmd-${side}-date-field`).hidden, true);
+    assert.equal(doc.querySelector(`#dmd-${side}-id-field`).hidden, false);
+    kind.value = 'date'; kind.dispatchEvent(new dom.window.Event('change'));
+  }
+  assert.equal(doc.querySelector('#dmd-rx-author').previousElementSibling.textContent.trim(), 'Author(s)');
+  assert.ok(doc.querySelector('#dmd-rx-user-avatar'));
+  assert.ok(doc.querySelector('#dmd-rx-guild-avatar'));
+  const startKind = doc.querySelector('#dmd-rx-start-kind');
+  startKind.value = 'date'; startKind.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(doc.querySelector('#dmd-rx-start-id-field').hidden, true);
+  assert.equal(doc.querySelector('#dmd-rx-start-date-field').hidden, false);
+  assert.equal(doc.querySelector('#dmd-rx-start-date-field .dmd-select-trigger').textContent, 'Choose date & time');
+  startKind.value = 'id'; startKind.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(doc.querySelector('#dmd-rx-start-date-field').hidden, true);
+  assert.equal(doc.querySelector('#dmd-start').nextElementSibling.id, 'dmd-add-queue');
+  assert.equal(doc.querySelector('#dmd-add-queue').classList.contains('dmd-orange'), true);
+  assert.equal(doc.querySelector('#dmd-queue-conversation-inputs'), null);
+  assert.equal(doc.querySelector('#dmd-multi-add-current'), null);
+  assert.equal(doc.querySelector('#dmd-multi-add-manual'), null);
+  assert.equal(doc.querySelector('#dmd-id-input').placeholder, 'Paste message IDs or Discord message links (one per line)');
+  const add = doc.querySelector('#dmd-add-queue').onclick();
   assert.equal(doc.querySelectorAll('.dmd-queue-row').length, 0);
   doc.querySelector('.dmd-confirm-actions button:last-child').click();
   await add;
-  const duplicate = doc.querySelector('#dmd-multi-add-current').onclick();
+  const duplicate = doc.querySelector('#dmd-add-queue').onclick();
   doc.querySelector('.dmd-confirm-actions button:last-child').click();
   await duplicate;
   assert.equal(doc.querySelectorAll('.dmd-queue-row').length, 1);
   assert.equal(JSON.parse(dom.window.localStorage.getItem('del_discord_v1_queue')).length, 1);
   doc.querySelector('.dmd-queue-row .dmd-red').click();
   assert.equal(doc.querySelectorAll('.dmd-queue-row').length, 0);
+  const idsInput = doc.querySelector('#dmd-id-input');
+  const firstLink = 'https://discord.com/channels/@me/1440796733998370860/1440796733998370861';
+  idsInput.value = firstLink + '\ninvalid line';
+  const importedLink = 'https://discord.com/channels/@me/1440796733998370860/1440796733998370862';
+  await doc.querySelector('#dmd-id-files').onchange({ target: { files: [{ name: 'messages.txt', text: async () => importedLink }] } });
+  assert.equal(idsInput.value, firstLink + '\ninvalid line\n' + importedLink);
+  assert.equal(doc.querySelector('#dmd-id-count').textContent, '2 IDs');
+  await doc.querySelector('#dmd-id-files').onchange({ target: { files: [{ name: 'messages.txt', text: async () => importedLink }] } });
+  assert.equal(doc.querySelector('#dmd-id-count').textContent, '2 IDs');
+  doc.querySelector('#dmd-id-clear').click();
+  assert.equal(idsInput.value, '');
+  assert.equal(doc.querySelector('#dmd-id-count').textContent, '0 IDs');
   vm.runInContext(bundle, dom.getInternalVMContext());
   doc.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
   assert.equal(doc.querySelectorAll('#dmd-panel').length, 1);
@@ -269,4 +312,18 @@ test('both bottom corners resize with the opposite horizontal edge anchored and 
   assert.equal(saved.width, 760);
   assert.equal(saved.height, 450);
   assert.equal(saved.ratio, saved.width / saved.height);
+});
+
+test('bundled UI loads even when Discord hides local storage', async t => {
+  const dom = new JSDOM('<header><div role="toolbar"></div></header>', { url: 'https://discord.com/channels/@me/123456789012345678', runScripts: 'outside-only', pretendToBeVisual: true });
+  t.after(() => dom.window.close());
+  Object.defineProperty(dom.window, 'localStorage', { configurable: true, get() { throw new Error('Storage unavailable'); } });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetParent', { get() { return this.parentElement; } });
+  dom.window.HTMLElement.prototype.getBoundingClientRect = () => ({ width: 500, height: 40, top: 20, left: 400, right: 900 });
+  const errors = []; dom.window.addEventListener('error', event => { errors.push(event.message); event.preventDefault(); });
+  vm.runInContext(await readFile('dist/Del-Discord-v1.user.js', 'utf8'), dom.getInternalVMContext());
+  dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
+  assert.ok(dom.window.document.querySelector('#dmd-toolbar-btn'));
+  assert.ok(dom.window.document.querySelector('#dmd-clear-filters'));
+  assert.deepEqual(errors, []);
 });

@@ -1,6 +1,10 @@
 // Del-Discord v1 — personal source modules.
 
 export const historyIndexes = new WeakMap();
+const revisions = new WeakMap();
+
+export const historyRevision = map => revisions.get(map) || 0;
+const changed = map => revisions.set(map, historyRevision(map) + 1);
 
 export function indexesFor(map) {
   let indexes = historyIndexes.get(map);
@@ -11,7 +15,8 @@ export function indexesFor(map) {
     byChannel: new Map()
   };
 
-  for (const [key, value] of Object.entries(map)) {
+  for (const key of Object.keys(map)) {
+    const value = map[key];
     if (value?.userId) indexes.byUser.set(value.userId, key);
     if (value?.channelId) indexes.byChannel.set(value.channelId, key);
   }
@@ -81,6 +86,8 @@ export function merge(map, incoming) {
 
   if (merged.userId) indexes.byUser.set(merged.userId, key);
   if (merged.channelId) indexes.byChannel.set(merged.channelId, key);
+  changed(map);
+  return merged;
 }
 
 export function removeHistoryMatch(map, userId, channelId) {
@@ -104,6 +111,7 @@ export function removeHistoryMatch(map, userId, channelId) {
     if (value.userId) indexes.byUser.delete(value.userId);
     if (value.channelId) indexes.byChannel.delete(value.channelId);
     delete map[key];
+    changed(map);
   }
 }
 
