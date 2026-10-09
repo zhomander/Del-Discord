@@ -1,25 +1,59 @@
-name: Prepare draft release
+name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Verify release
+  plan:
+    name: Detect release version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      tag: ${{ steps.plan.outputs.tag }}
+      automatic: ${{ steps.plan.outputs.automatic }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+    steps:
+      - name: Check out exact commit and version history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Plan release
+        id: plan
+        run: node scripts/release-plan.mjs
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+
+  validate:
+    name: Verify release (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -31,35 +65,51 @@ jobs:
       - name: Match tag to project version
         run: node scripts/verify-release.mjs
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
       - name: Build, validate, and test
         run: npm run verify
       - name: Verify committed userscript
         run: git diff --exit-code -- dist/Del-Discord-v1.user.js
 
-  draft:
-    name: Create draft with verified files
-    needs: validate
+  publish:
+    name: Create release with verified files
+    needs: [plan, validate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - name: Check out verified tag
+      - name: Check out verified commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
-      - name: Prepare draft release
+      - name: Create tag and release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          AUTOMATIC_RELEASE: ${{ needs.plan.outputs.automatic }}
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          set -euo pipefail
+          if git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$RELEASE_SHA" ]; then
+              echo "Tag already points to another commit; refusing to reuse it."
+              exit 1
+            fi
+          fi
+          gh release list --limit 1000 --json tagName > "$RUNNER_TEMP/releases.json"
+          if jq -e --arg tag "$RELEASE_TAG" 'any(.[]; .tagName == $tag)' "$RUNNER_TEMP/releases.json" >/dev/null; then
             echo "Release already exists; leaving it unchanged."
             exit 0
           fi
+          flags=()
+          if [ "$AUTOMATIC_RELEASE" != "true" ]; then flags+=(--verify-tag --draft); fi
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease --latest=false); fi
           gh release create "$RELEASE_TAG" \
             dist/Del-Discord-v1.user.js LICENSE \
-            --verify-tag --draft --generate-notes \
+            --target "$RELEASE_SHA" --generate-notes "${flags[@]}" \
             --title "Del-Discord $RELEASE_TAG"
